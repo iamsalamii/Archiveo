@@ -151,20 +151,8 @@ export function SignatureRequestDialog({
 
       const result = await requestSignature(payload);
       
-      // Dispatching direct automatique selon le canal choisi
-      if ((channel === 'whatsapp' || channel === 'both') && result.whatsAppDirectLink) {
-        window.open(result.whatsAppDirectLink, '_blank');
-      }
-      
-      if (channel === 'email') {
-        const subject = encodeURIComponent(`Demande de signature électronique : ${result.documentTitle}`);
-        const body = encodeURIComponent(
-          `Bonjour ${signerName},\n\nVous êtes invité(e) à apposer votre signature électronique sur le document suivant :\n\n- Titre : ${result.documentTitle}\n- Référence : ${result.documentReference}\n\nVeuillez accéder à la plateforme Archivéo pour signer électroniquement ce document.\n\nCordialement,\nSystème de Gestion des Archives Archivéo`
-        );
-        window.location.href = `mailto:${signerEmail}?subject=${subject}&body=${body}`;
-      }
-
-      toast.success(`Demande transmise avec succès à ${signerName} ! Notification envoyée.`);
+      const channelLabel = channel === 'both' ? 'WhatsApp & Email' : channel === 'whatsapp' ? 'WhatsApp' : 'Email';
+      toast.success(`Demande transmise avec succès ! Invitation envoyée immédiatement à ${signerName} via ${channelLabel}.`);
       onCreated(result);
       onOpenChange(false);
     } catch (err: unknown) {

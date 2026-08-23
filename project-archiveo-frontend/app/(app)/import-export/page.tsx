@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useParameters } from '@/contexts/parameters-context';
 import { api } from '@/services/api';
 import toast from 'react-hot-toast';
+import { fetchAllSignatures } from '@/services/signatures-api';
 import { exportToCsv, exportToJson, exportToXml, exportToExcel, exportToPdf } from '@/utils/export';
 import {
   ArrowDownUp,
@@ -28,14 +29,35 @@ import {
 
 export default function ImportExportPage() {
   const { groups } = useParameters();
-  const [exportEntity, setExportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'users' | 'parameters' | 'loans' | 'workflows' | 'audit'>('documents');
-  const [importEntity, setImportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'loans' | 'workflows' | 'parameters' | 'users'>('documents');
+  const [exportEntity, setExportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'users' | 'parameters' | 'loans' | 'workflows' | 'audit' | 'signatures'>('documents');
+  const [importEntity, setImportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'loans' | 'workflows' | 'parameters' | 'users' | 'signatures'>('documents');
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const fetchEntityData = async (entity: string): Promise<{ data: Record<string, unknown>[]; filename: string; title: string }> => {
     switch (entity) {
+      case 'signatures': {
+        const list = await fetchAllSignatures();
+        return {
+          data: list.map((s) => ({
+            Reference: s.documentReference,
+            Titre_Document: s.documentTitle,
+            Signataire: s.signerName,
+            Email: s.signerEmail,
+            Telephone: s.signerPhone || '—',
+            Role: s.signerRole || '—',
+            Statut: s.status === 'signed' ? 'Signé' : s.status === 'rejected' ? 'Refusé' : 'En attente',
+            Canal: s.notificationChannel,
+            Date_Demande: s.requestedAt ? new Date(s.requestedAt).toLocaleDateString('fr-FR') : '',
+            Date_Signature: s.signedAt ? new Date(s.signedAt).toLocaleDateString('fr-FR') : '—',
+            Numero_Certificat: s.certificateNumber || '—',
+            Empreinte_SHA256: s.sha256Hash || '—',
+          })),
+          filename: 'export-parapheur-signatures',
+          title: 'Export du Parapheur Électronique & Signatures',
+        };
+      }
       case 'archives': {
         const archives = await api.getArchives();
         return {
@@ -254,6 +276,7 @@ export default function ImportExportPage() {
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {[
                   { key: 'documents', label: 'Documents GED', desc: 'Fichiers, métadonnées, statuts et versions' },
+                  { key: 'signatures', label: 'Parapheur & Signatures', desc: 'Actes de signature, statuts, certificats eIDAS et SHA-256' },
                   { key: 'archives', label: 'Archives physiques & numériques', desc: 'Emplacements, boîtes, conservation' },
                   { key: 'correspondences', label: 'Courriers (Entrants/Sortants)', desc: 'Expéditeurs, destinataires, dates' },
                   { key: 'loans', label: 'Prêts & Consultations', desc: 'Emprunteurs, échéances, motifs' },
@@ -336,6 +359,7 @@ export default function ImportExportPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="documents">Base Documentaire GED</SelectItem>
+                    <SelectItem value="signatures">Parapheur & Signatures Numériques</SelectItem>
                     <SelectItem value="archives">Registre des Archives</SelectItem>
                     <SelectItem value="correspondences">Registre des Courriers</SelectItem>
                     <SelectItem value="loans">Prêts & Consultations</SelectItem>
