@@ -2,7 +2,7 @@ import { HubConnection, HubConnectionBuilder, LogLevel } from '@microsoft/signal
 import { useEffect, useState, useRef } from 'react';
 import { AppNotification } from '@/types';
 import { getNotifications } from '@/services/api';
-import { API_BASE_URL } from '@/services/api-client';
+import { tokenService, API_BASE_URL } from '@/services/api-client';
 
 /**
  * Hook to manage real‑time notifications via SignalR.
@@ -14,11 +14,15 @@ export function useNotifications(userId: string) {
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const connectionRef = useRef<HubConnection | null>(null);
 
-  // Initialise SignalR connection once (singleton per hook instance)
+  // Initialise SignalR connection when authenticated
   useEffect(() => {
+    const token = tokenService.get();
+    if (!userId || !token) return;
+
     const hubUrl = `${API_BASE_URL}/hubs/notifications`;
     const connection = new HubConnectionBuilder()
       .withUrl(hubUrl, {
+        accessTokenFactory: () => tokenService.get() || '',
         withCredentials: true,
       })
       .configureLogging(LogLevel.Warning)
@@ -45,7 +49,7 @@ export function useNotifications(userId: string) {
     return () => {
       connection.stop().catch(() => {});
     };
-  }, []);
+  }, [userId]);
 
   // Load initial notifications once the userId is known
   useEffect(() => {

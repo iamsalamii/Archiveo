@@ -34,6 +34,12 @@ public sealed class PermissionAuthorizationHandler : AuthorizationHandler<Permis
         AuthorizationHandlerContext context,
         PermissionRequirement requirement)
     {
+        if (context.User.IsInRole("Admin") || context.User.HasClaim(ClaimTypes.Role, "Admin"))
+        {
+            context.Succeed(requirement);
+            return;
+        }
+
         var userIdValue = context.User.FindFirstValue(ClaimTypes.NameIdentifier);
         if (!Guid.TryParse(userIdValue, out var userId))
             return;

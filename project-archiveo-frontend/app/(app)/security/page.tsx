@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo, useCallback } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -307,7 +307,7 @@ export default function SecurityPage() {
                                     </TableHeader>
                                     <TableBody>
                                         {modules.map((module) => (
-                                            <>
+                                            <React.Fragment key={`module-grp-${module}`}>
                                                 <TableRow key={`module-${module}`} className="bg-muted/50">
                                                     <TableCell colSpan={matrix.roles.length + 2} className="font-semibold text-sm">
                                                         {MODULE_LABELS[module] || module}
@@ -331,7 +331,7 @@ export default function SecurityPage() {
                                                         <TableCell></TableCell>
                                                     </TableRow>
                                                 ))}
-                                            </>
+                                            </React.Fragment>
                                         ))}
                                         <TableRow className="border-t-2 bg-muted/30">
                                             <TableCell className="font-semibold">Actions</TableCell>

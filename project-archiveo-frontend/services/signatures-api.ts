@@ -99,7 +99,26 @@ export async function fetchDocumentSignatures(documentId: string): Promise<Docum
 }
 
 export async function requestSignature(payload: CreateSignaturePayload): Promise<DocumentSignatureApi> {
-  return apiClient.post<DocumentSignatureApi>('/api/signatures/request', payload);
+  const body: Record<string, unknown> = {
+    documentId: payload.documentId,
+    documentTitle: payload.documentTitle,
+    documentReference: payload.documentReference,
+    signerName: payload.signerName,
+    signerEmail: payload.signerEmail,
+    signerPhone: payload.signerPhone || null,
+    signerRole: payload.signerRole || null,
+    notificationChannel: payload.notificationChannel || 'both',
+    note: payload.note || null,
+  };
+
+  if (payload.signerUserId && payload.signerUserId.trim() !== '') {
+    body.signerUserId = payload.signerUserId;
+  }
+  if (payload.dueDate && payload.dueDate.trim() !== '') {
+    body.dueDate = new Date(payload.dueDate).toISOString();
+  }
+
+  return apiClient.post<DocumentSignatureApi>('/api/signatures/request', body);
 }
 
 export async function signDocument(id: string, payload: SignDocumentPayload): Promise<DocumentSignatureApi> {
