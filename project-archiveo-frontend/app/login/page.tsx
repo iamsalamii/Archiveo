@@ -162,10 +162,6 @@ export default function LoginPage() {
             </div>
           </CardContent>
         </Card>
-
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Compte de test : <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">admin@archiveo.com</code> / <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">Admin123!</code>
-        </p>
       </div>
     </div>
   );

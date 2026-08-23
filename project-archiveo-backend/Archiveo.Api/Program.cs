@@ -59,8 +59,11 @@ builder.Services.AddSwaggerGen(options =>
 
 // Configuration de la base de données
 builder.Services.AddDbContext<ApplicationDbContext>(options =>
+{
     options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")
-        ?? throw new InvalidOperationException("La chaîne de connexion DefaultConnection est requise.")));
+        ?? throw new InvalidOperationException("La chaîne de connexion DefaultConnection est requise."));
+    options.ConfigureWarnings(w => w.Ignore(Microsoft.EntityFrameworkCore.Diagnostics.RelationalEventId.PendingModelChangesWarning));
+});
 
 // Configuration de Identity
 builder.Services.AddIdentity<User, IdentityRole<Guid>>(options =>

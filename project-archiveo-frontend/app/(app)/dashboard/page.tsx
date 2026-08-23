@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -25,6 +26,7 @@ import {
   Activity,
   Users,
   Clock,
+  RotateCcw,
 } from 'lucide-react';
 import {
   AreaChart,
@@ -55,21 +57,29 @@ export default function DashboardPage() {
   const [loans, setLoans] = useState<LoanRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
+  const loadDashboardData = () => {
+    setLoading(true);
     Promise.all([
       api.getDocuments(),
       api.getArchives(),
       api.getActivityLog(),
       api.getUsers(),
       api.getLoans(),
-    ]).then(([d, a, act, u, l]) => {
-      setDocs(d);
-      setArchives(a);
-      setActivities(act);
-      setUsers(u);
-      setLoans(l);
-      setLoading(false);
-    });
+    ])
+      .then(([d, a, act, u, l]) => {
+        setDocs(d);
+        setArchives(a);
+        setActivities(act);
+        setUsers(u);
+        setLoans(l);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadDashboardData();
   }, []);
 
   const kpis = useMemo(() => {
@@ -87,33 +97,93 @@ export default function DashboardPage() {
     ];
   }, [docs, archives, loans, t]);
 
+  // Évolution mensuelle calculée à partir des données réelles
   const monthlyData = useMemo(() => {
     const months = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin', 'Juil', 'Août', 'Sep', 'Oct', 'Nov', 'Déc'];
-    return months.map((m, i) => ({
-      month: m,
-      documents: Math.floor(Math.random() * 40 + 10 + i * 3),
-      archives: Math.floor(Math.random() * 15 + 2 + i),
-    }));
-  }, []);
+    const currentYear = new Date().getFullYear();
 
+    return months.map((m, i) => {
+      const docCount = docs.filter((d) => {
+        if (!d.createdAt) return false;
+        const dt = new Date(d.createdAt);
+        return !isNaN(dt.getTime()) && dt.getMonth() === i && dt.getFullYear() === currentYear;
+      }).length;
+
+      const archCount = archives.filter((a) => {
+        const rawDate = a.enteredAt || a.destructionDate;
+        if (!rawDate) return false;
+        const dt = new Date(rawDate);
+        return !isNaN(dt.getTime()) && dt.getMonth() === i && dt.getFullYear() === currentYear;
+      }).length;
+
+      return {
+        month: m,
+        documents: docCount,
+        archives: archCount,
+      };
+    });
+  }, [docs, archives]);
+
+  // Répartition par type documentaire (dynamique)
   const byTypeData = useMemo(() => {
     const typeGroups = getItems('DOC_TYPE');
-    return typeGroups
-      .map((type, i) => ({
-        name: type.name,
-        value: docs.filter((d) => d.typeId === type.code).length,
-        color: chartColors[i % chartColors.length],
-      }))
-      .filter((d) => d.value > 0);
-  }, [docs, getItems]);
+    const map = new Map<string, { name: string; value: number }>();
 
+    // Initialiser avec tous les types configurés
+    typeGroups.forEach((t) => {
+      map.set(t.code, { name: t.name || t.code, value: 0 });
+    });
+
+    // Compter les documents réels
+    docs.forEach((d) => {
+      const code = d.typeId || 'AUTRE';
+      if (map.has(code)) {
+        map.get(code)!.value += 1;
+      } else {
+        const label = getItemName('DOC_TYPE', code) || code;
+        map.set(code, { name: label, value: 1 });
+      }
+    });
+
+    const activeList = Array.from(map.values()).filter((d) => d.value > 0);
+    // Si aucun document créé, afficher les types enregistrés avec valeur 0 pour la légende
+    const listToDisplay = activeList.length > 0 ? activeList : typeGroups.slice(0, 5).map((t) => ({ name: t.name, value: 0 }));
+
+    return listToDisplay.map((entry, i) => ({
+      ...entry,
+      color: chartColors[i % chartColors.length],
+    }));
+  }, [docs, getItems, getItemName]);
+
+  // Répartition par Service (inclut TOUS les services ajoutés dans Paramètres / Outils)
   const byServiceData = useMemo(() => {
     const services = getItems('SERVICE');
-    return services.map((s) => ({
-      name: s.name,
-      documents: docs.filter((d) => d.serviceId === s.code).length,
-    }));
-  }, [docs, getItems]);
+    const map = new Map<string, { name: string; documents: number }>();
+
+    // 1. Initialiser avec TOUS les services des paramètres
+    services.forEach((s) => {
+      map.set(s.code, { name: s.name || s.code, documents: 0 });
+    });
+
+    // 2. Agréger les documents par serviceId
+    docs.forEach((d) => {
+      if (d.serviceId && d.serviceId.trim() !== '') {
+        if (map.has(d.serviceId)) {
+          map.get(d.serviceId)!.documents += 1;
+        } else {
+          const label = getItemName('SERVICE', d.serviceId) || d.serviceId;
+          map.set(d.serviceId, { name: label, documents: 1 });
+        }
+      } else {
+        const unassigned = map.get('NON_ASSIGNE') || { name: 'Non assigné', documents: 0 };
+        unassigned.documents += 1;
+        map.set('NON_ASSIGNE', unassigned);
+      }
+    });
+
+    // Retourner la liste ordonnée
+    return Array.from(map.values()).sort((a, b) => b.documents - a.documents);
+  }, [docs, getItems, getItemName]);
 
   const topUsers = useMemo(() => {
     const counts = new Map<string, number>();
@@ -190,6 +260,16 @@ export default function DashboardPage() {
           subtitle: 'Vue consolidée des documents, archives et activités du système',
           filterSummary: 'Ensemble des entités actives',
         }}
+        actions={
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadDashboardData}
+            className="gap-2 text-xs"
+          >
+            <RotateCcw className="h-3.5 w-3.5" /> Actualiser les données
+          </Button>
+        }
       />
 
       {/* KPI Cards */}
@@ -286,11 +366,11 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
+            <ResponsiveContainer width="100%" height={Math.max(280, byServiceData.length * 36)}>
               <BarChart data={byServiceData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
                 <XAxis type="number" className="text-xs" />
-                <YAxis type="category" dataKey="name" className="text-xs" width={100} />
+                <YAxis type="category" dataKey="name" className="text-xs" width={140} tick={{ fontSize: 12 }} />
                 <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }} />
                 <Bar dataKey="documents" fill="#3b82f6" radius={[0, 4, 4, 0]} />
               </BarChart>

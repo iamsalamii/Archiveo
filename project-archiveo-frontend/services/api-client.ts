@@ -62,9 +62,13 @@ async function apiFetchInternal<T>(
       if (response.status === 401) {
       tokenService.remove();
       
-      const isOnLoginPage = typeof window !== 'undefined' && window.location.pathname === '/login';
+      const isPublicPage =
+        typeof window !== 'undefined' &&
+        (window.location.pathname === '/' ||
+          window.location.pathname === '/login' ||
+          window.location.pathname === '');
       
-      if (!isOnLoginPage && typeof window !== 'undefined') {
+      if (!isPublicPage && typeof window !== 'undefined') {
         window.location.href = '/login';
       }
       

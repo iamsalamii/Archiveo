@@ -405,6 +405,100 @@ namespace Archiveo.Infrastructure.Migrations
                     b.ToTable("Documents", (string)null);
                 });
 
+            modelBuilder.Entity("Archiveo.Domain.Entities.DocumentSignature", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("CertificateNumber")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("DocumentReference")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("DocumentTitle")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTime?>("DueDate")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("NotificationChannel")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("RejectReason")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("RequestedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("RequestedByUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("RequestedByUserName")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("SecurityPin")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Sha256Hash")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SignatureDataUrl")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SignatureType")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("SignedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("SignerEmail")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SignerIpAddress")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SignerName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<string>("SignerPhone")
+                        .HasColumnType("text");
+
+                    b.Property<string>("SignerRole")
+                        .HasColumnType("text");
+
+                    b.Property<Guid?>("SignerUserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("DocumentId");
+
+                    b.HasIndex("RequestedByUserId");
+
+                    b.HasIndex("SignerUserId");
+
+                    b.ToTable("DocumentSignatures", (string)null);
+                });
+
             modelBuilder.Entity("Archiveo.Domain.Entities.DocumentVersionRecord", b =>
                 {
                     b.Property<Guid>("Id")
@@ -839,6 +933,9 @@ namespace Archiveo.Infrastructure.Migrations
                     b.Property<string>("UserName")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)");
+
+                    b.Property<string>("WhatsAppNumber")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 

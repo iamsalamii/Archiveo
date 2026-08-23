@@ -58,6 +58,8 @@ public class UserService
             Function = request.Function,
             Matricule = request.Matricule,
             ServiceId = request.ServiceId,
+            PhoneNumber = request.Phone ?? request.WhatsAppNumber,
+            WhatsAppNumber = request.WhatsAppNumber ?? request.Phone,
             MustChangePassword = true,
             CreatedAt = DateTime.UtcNow
         };
@@ -93,6 +95,8 @@ public class UserService
         user.Function = request.Function;
         user.Matricule = request.Matricule;
         user.ServiceId = request.ServiceId;
+        user.PhoneNumber = request.Phone ?? request.WhatsAppNumber;
+        user.WhatsAppNumber = request.WhatsAppNumber ?? request.Phone;
         user.UpdatedAt = DateTime.UtcNow;
 
         var result = await _userManager.UpdateAsync(user);
@@ -164,6 +168,8 @@ public class UserService
             Function = u.Function,
             Matricule = u.Matricule,
             ServiceId = u.ServiceId,
+            Phone = u.PhoneNumber ?? u.WhatsAppNumber,
+            WhatsAppNumber = u.WhatsAppNumber ?? u.PhoneNumber,
             MustChangePassword = u.MustChangePassword,
             Roles = roles,
             CreatedAt = u.CreatedAt,

@@ -13,6 +13,8 @@ public class UserDto
     public string? Function { get; set; }
     public string? Matricule { get; set; }
     public string? ServiceId { get; set; }
+    public string? Phone { get; set; }
+    public string? WhatsAppNumber { get; set; }
     public bool MustChangePassword { get; set; }
     public List<string> Roles { get; set; } = new();
     public DateTime CreatedAt { get; set; }
@@ -29,6 +31,8 @@ public class CreateUserRequest
     public string? Function { get; set; }
     public string? Matricule { get; set; }
     public string? ServiceId { get; set; }
+    public string? Phone { get; set; }
+    public string? WhatsAppNumber { get; set; }
     public string? Password { get; set; }
     public List<string> Roles { get; set; } = new();
 }
@@ -42,6 +46,8 @@ public class UpdateUserRequest
     public string? Function { get; set; }
     public string? Matricule { get; set; }
     public string? ServiceId { get; set; }
+    public string? Phone { get; set; }
+    public string? WhatsAppNumber { get; set; }
 }
 
 public class AssignRolesRequest
