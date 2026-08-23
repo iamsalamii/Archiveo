@@ -55,6 +55,10 @@ export function SignaturePadDialog({
   const [pinCode, setPinCode] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const [savedUserPin, setSavedUserPin] = useState<string>('');
+  const [requireUserPin, setRequireUserPin] = useState<boolean>(false);
+  const [savedUserSig, setSavedUserSig] = useState<string | null>(null);
+
   // Initialize canvas
   const initCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -75,9 +79,24 @@ export function SignaturePadDialog({
       if (signature) {
         setTypedName(signature.signerName || '');
       }
+      if (typeof window !== 'undefined' && signature?.signerUserId) {
+        const pin = localStorage.getItem(`archiveo_pin_${signature.signerUserId}`) || '';
+        const req = localStorage.getItem(`archiveo_require_pin_${signature.signerUserId}`) !== 'false';
+        const sig = localStorage.getItem(`archiveo_signature_data_${signature.signerUserId}`);
+        setSavedUserPin(pin);
+        setRequireUserPin(req && Boolean(pin));
+        setSavedUserSig(sig);
+      }
       setTimeout(initCanvas, 150);
     }
   }, [open, signature, initCanvas]);
+
+  const loadSavedSignature = () => {
+    if (!savedUserSig) return;
+    setImagePreview(savedUserSig);
+    setMode('image');
+    toast.success('Votre signature de profil a été chargée avec succès !');
+  };
 
   // Drawing Canvas Handlers
   const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
@@ -173,6 +192,13 @@ export function SignaturePadDialog({
       toast.error('Veuillez apposer ou saisir votre signature avant de valider.');
       return;
     }
+    
+    if (requireUserPin && savedUserPin) {
+      if (!pinCode || pinCode.trim() !== savedUserPin.trim()) {
+        toast.error('Code PIN de signature incorrect. Veuillez renseigner le code PIN configuré dans votre profil.');
+        return;
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -211,7 +237,6 @@ export function SignaturePadDialog({
           </div>
         </DialogHeader>
 
-        {/* Info Signataire & Document */}
         <div className="grid grid-cols-2 gap-3 p-3 bg-muted/40 rounded-lg border text-sm">
           <div>
             <span className="text-muted-foreground block text-xs">Demandeur :</span>
@@ -229,135 +254,103 @@ export function SignaturePadDialog({
           )}
         </div>
 
-        {/* Sélection du mode de signature */}
-        <Tabs value={mode} onValueChange={(v) => setMode(v as 'drawing' | 'text' | 'image')} className="w-full">
-          <TabsList className="grid grid-cols-3 w-full">
-            <TabsTrigger value="drawing" className="gap-2">
-              <PenTool className="h-4 w-4" /> Dessiner
-            </TabsTrigger>
-            <TabsTrigger value="text" className="gap-2">
-              <Type className="h-4 w-4" /> Calligraphie
-            </TabsTrigger>
-            <TabsTrigger value="image" className="gap-2">
-              <Upload className="h-4 w-4" /> Importer image
-            </TabsTrigger>
-          </TabsList>
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label className="text-xs font-semibold">Mode d'apposition de la signature</Label>
+            {savedUserSig && (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={loadSavedSignature}
+                className="h-7 gap-1.5 text-xs text-primary border-primary/40 hover:bg-primary/5"
+              >
+                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" /> Utiliser ma signature de profil
+              </Button>
+            )}
+          </div>
+          <Tabs value={mode} onValueChange={(v) => setMode(v as 'drawing' | 'text' | 'image')} className="w-full">
+            <TabsList className="grid grid-cols-3 w-full">
+              <TabsTrigger value="drawing" className="gap-2">
+                <PenTool className="h-4 w-4" /> Dessiner
+              </TabsTrigger>
+              <TabsTrigger value="text" className="gap-2">
+                <Type className="h-4 w-4" /> Calligraphie
+              </TabsTrigger>
+              <TabsTrigger value="image" className="gap-2">
+                <Upload className="h-4 w-4" /> Importer image
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Mode 1: Dessin Canvas */}
-          <TabsContent value="drawing" className="space-y-3 pt-2">
-            <div className="relative border-2 border-dashed rounded-lg bg-background overflow-hidden p-1 shadow-inner">
-              <canvas
-                ref={canvasRef}
-                width={560}
-                height={160}
-                className="w-full h-40 cursor-crosshair touch-none bg-white rounded"
-                onMouseDown={startDrawing}
-                onMouseMove={draw}
-                onMouseUp={stopDrawing}
-                onMouseLeave={stopDrawing}
-                onTouchStart={startDrawing}
-                onTouchMove={draw}
-                onTouchEnd={stopDrawing}
-              />
-              <div className="absolute top-2 right-2 flex gap-1">
+            <TabsContent value="drawing" className="space-y-3 pt-2">
+              <div className="relative border-2 border-dashed rounded-lg bg-background overflow-hidden p-1 shadow-inner">
+                <canvas
+                  ref={canvasRef}
+                  width={560}
+                  height={160}
+                  className="w-full h-40 cursor-crosshair touch-none bg-white rounded"
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                />
+              </div>
+              <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <span>Dessinez à la souris ou au stylet tactile</span>
                 <Button
                   type="button"
+                  variant="ghost"
                   size="sm"
-                  variant="outline"
-                  className="h-8 gap-1 text-xs bg-background/80 backdrop-blur"
                   onClick={initCanvas}
+                  className="gap-1.5 h-7 text-xs"
                 >
-                  <RotateCcw className="h-3 w-3" /> Effacer
+                  <RotateCcw className="h-3.5 w-3.5" /> Effacer
                 </Button>
               </div>
-              <div className="absolute bottom-2 left-3 text-[11px] text-muted-foreground select-none pointer-events-none">
-                ✍️ Utilisez votre souris ou votre doigt pour apposer votre signature
+            </TabsContent>
+
+            <TabsContent value="text" className="space-y-3 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="sig-text" className="text-xs">Nom ou paraphe à calligraphier</Label>
+                <Input
+                  id="sig-text"
+                  value={typedName}
+                  onChange={(e) => setTypedName(e.target.value)}
+                  placeholder="Votre nom complet"
+                />
               </div>
-            </div>
-          </TabsContent>
+              <div className="p-6 bg-white dark:bg-slate-950 border rounded-lg flex items-center justify-center min-h-[100px] shadow-sm">
+                <p className="font-serif italic text-3xl text-blue-900 tracking-wide">
+                  {typedName || signature.signerName}
+                </p>
+              </div>
+            </TabsContent>
 
-          {/* Mode 2: Calligraphie générée */}
-          <TabsContent value="text" className="space-y-3 pt-2">
-            <div className="space-y-2">
-              <Label>Nom ou texte de la signature</Label>
-              <Input
-                value={typedName}
-                onChange={(e) => setTypedName(e.target.value)}
-                placeholder="Votre prénom et nom..."
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              {[
-                { label: 'Classique', font: 'font-serif italic text-2xl tracking-wide' },
-                { label: 'Élégante', font: 'font-sans font-light italic text-2xl tracking-wider' },
-                { label: 'Officielle', font: 'font-mono font-medium text-xl uppercase tracking-widest' },
-              ].map((style, idx) => (
-                <button
-                  key={idx}
-                  type="button"
-                  onClick={() => setSelectedFont(style.font)}
-                  className={`p-3 border rounded-lg text-center transition-all ${
-                    selectedFont === style.font
-                      ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
-                      : 'border-border hover:bg-muted/50'
-                  }`}
-                >
-                  <span className="text-xs text-muted-foreground block mb-1">{style.label}</span>
-                  <p className={`${style.font} text-primary truncate`}>
-                    {typedName || signature.signerName || 'Signature'}
-                  </p>
-                </button>
-              ))}
-            </div>
-          </TabsContent>
-
-          {/* Mode 3: Import Image */}
-          <TabsContent value="image" className="space-y-3 pt-2">
-            <div className="border-2 border-dashed rounded-lg p-6 text-center space-y-3 bg-muted/20">
-              {imagePreview ? (
-                <div className="space-y-2">
-                  <img
-                    src={imagePreview}
-                    alt="Aperçu signature"
-                    className="max-h-28 mx-auto object-contain bg-white p-2 rounded border"
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setImagePreview(null)}
-                    className="text-xs gap-1"
-                  >
-                    <RotateCcw className="h-3 w-3" /> Changer d'image
-                  </Button>
+            <TabsContent value="image" className="space-y-3 pt-2">
+              <div className="space-y-2">
+                <Label htmlFor="sig-file" className="text-xs">Fichier image de signature (PNG transparent recommandé)</Label>
+                <Input
+                  id="sig-file"
+                  type="file"
+                  accept="image/png, image/jpeg, image/webp"
+                  onChange={handleImageUpload}
+                />
+              </div>
+              {imagePreview && (
+                <div className="p-4 bg-white dark:bg-slate-950 border rounded-lg flex items-center justify-center min-h-[100px]">
+                  <img src={imagePreview} alt="Aperçu signature" className="max-h-24 object-contain" />
                 </div>
-              ) : (
-                <>
-                  <Upload className="h-8 w-8 mx-auto text-muted-foreground" />
-                  <div>
-                    <Label htmlFor="sig-file" className="cursor-pointer text-sm font-medium text-primary hover:underline">
-                      Sélectionnez une image de votre signature
-                    </Label>
-                    <p className="text-xs text-muted-foreground mt-1">PNG transparent, JPG ou WEBP (Max 2 Mo)</p>
-                  </div>
-                  <Input
-                    id="sig-file"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    onChange={handleImageUpload}
-                  />
-                </>
               )}
-            </div>
-          </TabsContent>
-        </Tabs>
+            </TabsContent>
+          </Tabs>
+        </div>
 
-        {/* Aperçu du Tampon Officiel de Scellement */}
-        <div className="p-3 border border-blue-200 bg-blue-50/50 dark:bg-blue-950/20 dark:border-blue-900 rounded-lg text-xs space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="font-semibold text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+        <div className="p-3 bg-blue-50/70 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-900 rounded-lg text-xs space-y-1.5">
+          <div className="flex items-center justify-between font-semibold text-blue-900 dark:text-blue-300">
+            <span className="flex items-center gap-1.5">
               <ShieldCheck className="h-4 w-4 text-blue-600" /> Sceau Électronique Certifié (Norme eIDAS)
             </span>
             <Badge variant="outline" className="bg-white/80 text-[10px] text-blue-800 dark:bg-slate-900 dark:text-blue-300">
@@ -369,23 +362,26 @@ export function SignaturePadDialog({
           </p>
         </div>
 
-        {/* Code de confirmation PIN (Optionnel / Sécurité renforcée) */}
         <div className="space-y-1.5">
-          <Label htmlFor="pin" className="text-xs flex items-center gap-1 text-muted-foreground">
-            <Lock className="h-3 w-3" /> Code de sécurité / PIN Signataire (Optionnel)
-          </Label>
+          <div className="flex items-center justify-between">
+            <Label htmlFor="pin" className="text-xs flex items-center gap-1 text-muted-foreground">
+              <Lock className="h-3 w-3" /> Code de sécurité / PIN de Signature {requireUserPin && <span className="text-red-500">* (Exigé par votre profil)</span>}
+            </Label>
+            <a href="/profile" target="_blank" className="text-[11px] text-primary hover:underline">
+              Gérer mon PIN de profil →
+            </a>
+          </div>
           <Input
             id="pin"
             type="password"
-            placeholder="Ex : 123456"
+            placeholder={requireUserPin ? "Entrez votre code PIN configuré" : "Ex : 1234 (Optionnel)"}
             value={pinCode}
             onChange={(e) => setPinCode(e.target.value)}
-            className="h-9 text-xs"
+            className="h-9 text-xs font-mono tracking-wider"
             maxLength={10}
           />
         </div>
 
-        {/* Consentement juridique */}
         <div className="flex items-start space-x-2 pt-1">
           <Checkbox
             id="consent"

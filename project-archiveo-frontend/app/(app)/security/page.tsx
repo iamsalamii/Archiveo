@@ -274,7 +274,7 @@ export default function SecurityPage() {
                 <TabsList>
                     <TabsTrigger value="matrix">Matrice RBAC</TabsTrigger>
                     <TabsTrigger value="roles">Gestion des roles</TabsTrigger>
-                    <TabsTrigger value="sessions">Sessions & JWT</TabsTrigger>
+                    <TabsTrigger value="sessions">Sessions & Authentification</TabsTrigger>
                 </TabsList>
 
                 {/* Onglet 1 : Matrice RBAC */}

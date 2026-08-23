@@ -1,5 +1,7 @@
 'use client';
 
+import React, { useState } from 'react';
+
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -74,11 +76,16 @@ export default function ProfilePage() {
       <Tabs defaultValue="info">
         <TabsList>
           <TabsTrigger value="info">Informations</TabsTrigger>
+          <TabsTrigger value="signature">Signature & PIN</TabsTrigger>
           <TabsTrigger value="password">Mot de passe</TabsTrigger>
           <TabsTrigger value="preferences">Préférences</TabsTrigger>
           <TabsTrigger value="sessions">Sessions</TabsTrigger>
           <TabsTrigger value="log">Journal</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="signature">
+          <SignatureProfileSettings userId={user.id} userName={`${user.firstName} ${user.lastName}`} />
+        </TabsContent>
 
         <TabsContent value="info">
           <Card>
@@ -225,6 +232,265 @@ export default function ProfilePage() {
           </Card>
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function SignatureProfileSettings({ userId, userName }: { userId: string; userName: string }) {
+  const [pin, setPin] = useState('');
+  const [confirmPin, setConfirmPin] = useState('');
+  const [requirePin, setRequirePin] = useState(true);
+  const [signatureData, setSignatureData] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'draw' | 'type'>('draw');
+  const [isDrawing, setIsDrawing] = useState(false);
+  const canvasRef = React.useRef<HTMLCanvasElement | null>(null);
+
+  React.useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedPin = localStorage.getItem(`archiveo_pin_${userId}`) || '';
+      const savedReq = localStorage.getItem(`archiveo_require_pin_${userId}`) !== 'false';
+      const savedSig = localStorage.getItem(`archiveo_signature_data_${userId}`);
+      setPin(savedPin);
+      setConfirmPin(savedPin);
+      setRequirePin(savedReq);
+      if (savedSig) {
+        setSignatureData(savedSig);
+      }
+    }
+  }, [userId]);
+
+  const handleSavePin = () => {
+    if (pin && pin.length < 4) {
+      toast.error('Le code PIN doit comporter au moins 4 chiffres.');
+      return;
+    }
+    if (pin !== confirmPin) {
+      toast.error('Les deux codes PIN saisis ne correspondent pas.');
+      return;
+    }
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(`archiveo_pin_${userId}`, pin);
+      localStorage.setItem(`archiveo_require_pin_${userId}`, String(requirePin));
+      if (signatureData) {
+        localStorage.setItem(`archiveo_signature_data_${userId}`, signatureData);
+      }
+    }
+    toast.success('Paramètres de signature et code PIN enregistrés avec succès !');
+  };
+
+  const clearCanvas = () => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    setSignatureData(null);
+  };
+
+  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    setIsDrawing(true);
+    const rect = canvas.getBoundingClientRect();
+    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.lineWidth = 2.5;
+    ctx.lineCap = 'round';
+    ctx.strokeStyle = '#1e3a8a';
+  };
+
+  const draw = (e: React.MouseEvent<HTMLCanvasElement> | React.TouchEvent<HTMLCanvasElement>) => {
+    if (!isDrawing) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = 'touches' in e ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = 'touches' in e ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    if (!isDrawing) return;
+    setIsDrawing(false);
+    const canvas = canvasRef.current;
+    if (canvas) {
+      setSignatureData(canvas.toDataURL('image/png'));
+    }
+  };
+
+  const generateCalligraphy = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 400;
+    canvas.height = 140;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(0, 0, 400, 140);
+
+    ctx.font = 'italic 34px "Brush Script MT", "Caveat", "Dancing Script", cursive';
+    ctx.fillStyle = '#1e3a8a';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(userName, 200, 60);
+
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(80, 95);
+    ctx.quadraticCurveTo(200, 110, 320, 90);
+    ctx.stroke();
+
+    const dataUrl = canvas.toDataURL('image/png');
+    setSignatureData(dataUrl);
+  };
+
+  return (
+    <div className="grid gap-6 md:grid-cols-2">
+      {/* Code PIN de Signature */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lock className="h-4 w-4 text-primary" /> Code PIN de Sécurité de Signature
+          </CardTitle>
+          <CardDescription>
+            Définissez votre code confidentiel personnel à 4 chiffres exigé pour valider chaque signature.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="spin">Code PIN personnel (4 à 6 chiffres)</Label>
+            <Input
+              id="spin"
+              type="password"
+              maxLength={6}
+              value={pin}
+              onChange={(e) => setPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Ex : 1234"
+              className="text-lg font-mono tracking-widest"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="scpin">Confirmer le Code PIN</Label>
+            <Input
+              id="scpin"
+              type="password"
+              maxLength={6}
+              value={confirmPin}
+              onChange={(e) => setConfirmPin(e.target.value.replace(/\D/g, ''))}
+              placeholder="Répétez votre PIN"
+              className="text-lg font-mono tracking-widest"
+            />
+          </div>
+
+          <div className="flex items-center justify-between rounded-lg border p-3">
+            <div className="space-y-0.5">
+              <Label className="text-xs font-semibold">Exiger le code PIN à chaque signature</Label>
+              <p className="text-[11px] text-muted-foreground">Renforce la valeur probante de vos signatures eIDAS.</p>
+            </div>
+            <Switch checked={requirePin} onCheckedChange={setRequirePin} />
+          </div>
+
+          <Button onClick={handleSavePin} className="w-full">
+            Enregistrer mon PIN & Signature
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Signature par Défaut */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base flex items-center gap-2">
+            <UserCircle className="h-4 w-4 text-primary" /> Signature Manuscrite par Défaut
+          </CardTitle>
+          <CardDescription>
+            Votre signature enregistrée sera automatiquement pré-remplie dans le parapheur.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              size="sm"
+              variant={activeTab === 'draw' ? 'default' : 'outline'}
+              onClick={() => setActiveTab('draw')}
+              className="text-xs"
+            >
+              Tracer au stylet / souris
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activeTab === 'type' ? 'default' : 'outline'}
+              onClick={() => {
+                setActiveTab('type');
+                generateCalligraphy();
+              }}
+              className="text-xs"
+            >
+              Générer calligraphie
+            </Button>
+          </div>
+
+          {activeTab === 'draw' ? (
+            <div className="space-y-2">
+              <div className="border-2 border-dashed rounded-lg bg-white dark:bg-slate-950 p-1">
+                <canvas
+                  ref={canvasRef}
+                  width={340}
+                  height={130}
+                  onMouseDown={startDrawing}
+                  onMouseMove={draw}
+                  onMouseUp={stopDrawing}
+                  onMouseLeave={stopDrawing}
+                  onTouchStart={startDrawing}
+                  onTouchMove={draw}
+                  onTouchEnd={stopDrawing}
+                  className="w-full h-[130px] touch-none cursor-crosshair"
+                />
+              </div>
+              <div className="flex justify-between items-center text-xs">
+                <span className="text-muted-foreground">Tracez votre signature ci-dessus</span>
+                <Button type="button" variant="ghost" size="sm" onClick={clearCanvas} className="text-xs h-7">
+                  Effacer
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {signatureData && (
+                <div className="border rounded-lg p-3 bg-white flex items-center justify-center min-h-[130px]">
+                  <img src={signatureData} alt="Signature" className="max-h-24 object-contain" />
+                </div>
+              )}
+              <Button type="button" variant="outline" size="sm" onClick={generateCalligraphy} className="w-full text-xs">
+                Régénérer le style calligraphique
+              </Button>
+            </div>
+          )}
+
+          {signatureData && (
+            <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900 rounded-lg text-xs text-emerald-800 dark:text-emerald-300 flex items-center gap-2">
+              <Badge variant="outline" className="bg-emerald-100 text-emerald-800 border-emerald-300 text-[10px]">
+                Active
+              </Badge>
+              Signature prête pour le Parapheur Électronique
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 }
