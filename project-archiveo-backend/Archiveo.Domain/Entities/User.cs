@@ -10,6 +10,7 @@ public class User : IdentityUser<Guid>
     public string? Function { get; set; }
     public string? ServiceId { get; set; }
     public string? ProfileId { get; set; }
+    public string? WhatsAppNumber { get; set; }
     public bool MustChangePassword { get; set; } = true;
     public bool IsActive { get; set; } = true;
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;

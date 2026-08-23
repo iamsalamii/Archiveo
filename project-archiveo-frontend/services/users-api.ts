@@ -9,6 +9,7 @@ export interface UserApi {
     function?: string;
     matricule?: string;
     serviceId?: string;
+    phone?: string;
     mustChangePassword: boolean;
     roles: string[];
     createdAt: string;
@@ -24,6 +25,7 @@ export interface CreateUserPayload {
     function?: string;
     matricule?: string;
     serviceId?: string;
+    phone?: string;
     password?: string;
     roles: string[];
 }
@@ -36,6 +38,7 @@ export interface UpdateUserPayload {
     function?: string;
     matricule?: string;
     serviceId?: string;
+    phone?: string;
 }
 
 export interface RoleApi {

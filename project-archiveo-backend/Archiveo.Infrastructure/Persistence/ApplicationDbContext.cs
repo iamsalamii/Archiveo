@@ -24,6 +24,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
     public DbSet<Workflow> Workflows => Set<Workflow>();
     public DbSet<WorkflowStep> WorkflowSteps => Set<WorkflowStep>();
     public DbSet<Notification> Notifications => Set<Notification>();
+    public DbSet<DocumentSignature> DocumentSignatures => Set<DocumentSignature>();
 
     protected override void OnModelCreating(ModelBuilder builder)
     {
@@ -256,6 +257,19 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
                 .WithMany()
                 .HasForeignKey(e => e.RoleId)
                 .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<DocumentSignature>(entity =>
+        {
+            entity.ToTable("DocumentSignatures");
+            entity.HasKey(e => e.Id);
+            entity.Property(e => e.DocumentTitle).IsRequired().HasMaxLength(255);
+            entity.Property(e => e.SignerName).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.SignerEmail).IsRequired().HasMaxLength(200);
+            entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
+            entity.HasIndex(e => e.DocumentId);
+            entity.HasIndex(e => e.SignerUserId);
+            entity.HasIndex(e => e.RequestedByUserId);
         });
     }
 }

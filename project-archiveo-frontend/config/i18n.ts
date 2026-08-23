@@ -25,6 +25,7 @@ export const translations = {
     'nav.correspondence': 'Courriers',
     'nav.loans': 'Prêts',
     'nav.workflows': 'Workflows',
+    'nav.signatures': 'Parapheur & Signatures',
 
     // Common
     'common.save': 'Enregistrer',
@@ -142,6 +143,7 @@ export const translations = {
     'nav.correspondence': 'Correspondence',
     'nav.loans': 'Loans',
     'nav.workflows': 'Workflows',
+    'nav.signatures': 'E-Signatures & Parapheur',
 
     'common.save': 'Save',
     'common.cancel': 'Cancel',

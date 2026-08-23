@@ -28,6 +28,7 @@ const navItems: NavItem[] = [
   { href: '/correspondence', labelKey: 'nav.correspondence', icon: 'Mail', group: 'main', permission: 'correspondence.read' },
   { href: '/loans', labelKey: 'nav.loans', icon: 'HandHelping', group: 'main', permission: 'loans.read' },
   { href: '/workflows', labelKey: 'nav.workflows', icon: 'Workflow', group: 'main', permission: 'workflows.read' },
+  { href: '/signatures', labelKey: 'nav.signatures', icon: 'PenTool', group: 'main', permission: 'documents.read' },
   { href: '/users', labelKey: 'nav.users', icon: 'Users', group: 'admin', permission: 'users.read' },
   { href: '/parameters', labelKey: 'nav.parameters' as TranslationKey, icon: 'Sliders', group: 'admin', permission: 'parameters.read' },
   { href: '/audit', labelKey: 'nav.audit', icon: 'History', group: 'admin', permission: 'audit.read' },

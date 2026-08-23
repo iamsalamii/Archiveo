@@ -123,6 +123,7 @@ builder.Services.AddScoped<PermissionService>();
 builder.Services.AddScoped<CorrespondenceService>();
 builder.Services.AddScoped<WorkflowService>();
 builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<SignatureService>();
 
 // SignalR pour les notifications en temps réel
 builder.Services.AddSignalR();

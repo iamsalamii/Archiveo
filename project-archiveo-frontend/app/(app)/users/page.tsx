@@ -52,6 +52,7 @@ import {
     Shield,
     Key,
     Loader2,
+    Smartphone,
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -79,6 +80,7 @@ export default function UsersPage() {
         function: '',
         matricule: '',
         serviceId: '',
+        phone: '',
         password: '',
         roles: [] as string[],
     });
@@ -147,6 +149,7 @@ export default function UsersPage() {
             function: '',
             matricule: '',
             serviceId: '',
+            phone: '',
             password: '',
             roles: [],
         });
@@ -163,6 +166,7 @@ export default function UsersPage() {
             function: user.function || '',
             matricule: user.matricule || '',
             serviceId: user.serviceId || '',
+            phone: user.phone || '',
             password: '',
             roles: user.roles,
         });
@@ -210,6 +214,7 @@ export default function UsersPage() {
                               function: form.function || undefined,
                               matricule: form.matricule || undefined,
                               serviceId: form.serviceId || undefined,
+                              phone: form.phone || undefined,
                           }
                         : u
                 )
@@ -226,6 +231,7 @@ export default function UsersPage() {
                     function: form.function || undefined,
                     matricule: form.matricule || undefined,
                     serviceId: form.serviceId || undefined,
+                    phone: form.phone || undefined,
                 });
                 toast.success('Utilisateur mis à jour');
             } else {
@@ -237,6 +243,7 @@ export default function UsersPage() {
                     function: form.function || undefined,
                     matricule: form.matricule || undefined,
                     serviceId: form.serviceId || undefined,
+                    phone: form.phone || undefined,
                     password: form.password || undefined,
                     roles: form.roles,
                 });
@@ -543,6 +550,17 @@ export default function UsersPage() {
                                 value={form.matricule}
                                 onChange={(e) => setForm({ ...form, matricule: e.target.value })}
                                 placeholder="MAT001"
+                            />
+                        </div>
+                        <div className="space-y-2 sm:col-span-2">
+                            <Label className="flex items-center gap-1.5">
+                                <Smartphone className="h-3.5 w-3.5 text-emerald-600" />
+                                Numéro WhatsApp / Mobile (Alertes directes de signature)
+                            </Label>
+                            <Input
+                                value={form.phone}
+                                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                                placeholder="+225 0708091011 ou +33 6 12 34 56 78"
                             />
                         </div>
                         <div className="space-y-2 sm:col-span-2">
