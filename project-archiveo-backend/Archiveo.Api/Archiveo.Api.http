@@ -1,0 +1,6 @@
+@Archiveo.Api_HostAddress = http://localhost:5199
+
+GET {{Archiveo.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
