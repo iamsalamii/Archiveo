@@ -83,8 +83,13 @@ public class SignaturesController : ControllerBase
         try
         {
             var ip = HttpContext.Connection.RemoteIpAddress?.ToString() ?? "127.0.0.1";
-            var result = await _signatureService.SignAsync(id, request, ip);
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+            var result = await _signatureService.SignAsync(id, request, ip, GetUserId(), GetUserEmail(), isAdmin);
             return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -98,8 +103,13 @@ public class SignaturesController : ControllerBase
     {
         try
         {
-            var result = await _signatureService.RejectAsync(id, request);
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+            var result = await _signatureService.RejectAsync(id, request, GetUserId(), GetUserEmail(), isAdmin);
             return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (Exception ex)
         {

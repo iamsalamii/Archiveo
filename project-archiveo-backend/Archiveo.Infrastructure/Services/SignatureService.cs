@@ -112,7 +112,7 @@ public class SignatureService
         return MapToDto(signature);
     }
 
-    public async Task<DocumentSignatureDto> SignAsync(Guid id, SignDocumentRequest request, string ipAddress)
+    public async Task<DocumentSignatureDto> SignAsync(Guid id, SignDocumentRequest request, string ipAddress, Guid currentUserId, string currentUserEmail, bool isAdmin)
     {
         var signature = await _dbContext.DocumentSignatures.FindAsync(id);
         if (signature == null)
@@ -120,6 +120,18 @@ public class SignatureService
 
         if (signature.Status != "pending")
             throw new InvalidOperationException("Cette demande a déjà été traitée.");
+
+        // Sécurité : Seul le signataire désigné ou l'administrateur système a le droit d'apposer une signature
+        if (!isAdmin)
+        {
+            var isDesignatedSigner = (signature.SignerUserId.HasValue && signature.SignerUserId.Value == currentUserId)
+                || (!string.IsNullOrEmpty(signature.SignerEmail) && string.Equals(signature.SignerEmail, currentUserEmail, StringComparison.OrdinalIgnoreCase));
+
+            if (!isDesignatedSigner)
+            {
+                throw new UnauthorizedAccessException("Contrôle de sécurité : Vous n'êtes pas autorisé(e) à signer ce document à la place du signataire désigné.");
+            }
+        }
 
         // Compute SHA-256 integrity hash
         var payloadToHash = $"{signature.Id}:{signature.DocumentId}:{signature.SignerEmail}:{DateTime.UtcNow:O}:{request.SignatureDataUrl}";
@@ -153,7 +165,7 @@ public class SignatureService
         return MapToDto(signature);
     }
 
-    public async Task<DocumentSignatureDto> RejectAsync(Guid id, RejectSignatureRequest request)
+    public async Task<DocumentSignatureDto> RejectAsync(Guid id, RejectSignatureRequest request, Guid currentUserId, string currentUserEmail, bool isAdmin)
     {
         var signature = await _dbContext.DocumentSignatures.FindAsync(id);
         if (signature == null)
@@ -161,6 +173,18 @@ public class SignatureService
 
         if (signature.Status != "pending")
             throw new InvalidOperationException("Cette demande a déjà été traitée.");
+
+        // Sécurité : Seul le signataire désigné ou l'administrateur système a le droit de rejeter
+        if (!isAdmin)
+        {
+            var isDesignatedSigner = (signature.SignerUserId.HasValue && signature.SignerUserId.Value == currentUserId)
+                || (!string.IsNullOrEmpty(signature.SignerEmail) && string.Equals(signature.SignerEmail, currentUserEmail, StringComparison.OrdinalIgnoreCase));
+
+            if (!isDesignatedSigner)
+            {
+                throw new UnauthorizedAccessException("Contrôle de sécurité : Vous n'êtes pas autorisé(e) à rejeter cette demande assignée à un autre signataire.");
+            }
+        }
 
         signature.Status = "rejected";
         signature.RejectReason = request.Reason;
