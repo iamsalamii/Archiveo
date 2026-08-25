@@ -56,7 +56,7 @@ public class CorrespondenceService
             SenderId = request.SenderId,
             RecipientId = request.RecipientId,
             Date = request.Date ?? DateTime.UtcNow,
-            DocumentId = request.DocumentId,
+            DocumentId = request.DocumentId == Guid.Empty ? null : request.DocumentId,
             SignatureTypeId = request.SignatureTypeId,
             Notes = request.Notes,
             CreatedBy = userId,

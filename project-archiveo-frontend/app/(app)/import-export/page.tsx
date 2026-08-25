@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useParameters } from '@/contexts/parameters-context';
 import { api } from '@/services/api';
-import toast from 'react-hot-toast';
 import { fetchAllSignatures } from '@/services/signatures-api';
 import { exportToCsv, exportToJson, exportToXml, exportToExcel, exportToPdf } from '@/utils/export';
 import {
@@ -21,22 +20,62 @@ import {
   FileJson,
   FileCode,
   Printer,
-  FileCheck,
-  Layers,
   CheckCircle2,
   Loader2,
+  Warehouse,
+  FileSearch,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 export default function ImportExportPage() {
   const { groups } = useParameters();
-  const [exportEntity, setExportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'users' | 'parameters' | 'loans' | 'workflows' | 'audit' | 'signatures'>('documents');
-  const [importEntity, setImportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'loans' | 'workflows' | 'parameters' | 'users' | 'signatures'>('documents');
+  const [exportEntity, setExportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'users' | 'parameters' | 'loans' | 'workflows' | 'audit' | 'signatures' | 'topography' | 'ocr'>('documents');
+  const [importEntity, setImportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'loans' | 'workflows' | 'parameters' | 'users' | 'signatures' | 'topography' | 'ocr'>('documents');
   const [isExporting, setIsExporting] = useState(false);
   const [isImporting, setIsImporting] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   const fetchEntityData = async (entity: string): Promise<{ data: Record<string, unknown>[]; filename: string; title: string }> => {
     switch (entity) {
+      case 'topography': {
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('archiveo_topography_boxes') : null;
+        const boxes = saved ? JSON.parse(saved) : [];
+        return {
+          data: boxes.map((b: any, idx: number) => ({
+            'N°': idx + 1,
+            'Code Carton': b.code,
+            Titre: b.title,
+            Bâtiment: b.building,
+            Magasin: b.room,
+            Travée: b.bay,
+            Étagère: b.shelf,
+            Service: b.department,
+            Documents: b.totalDocuments,
+            'Échéance Rétention': b.retentionYear,
+            Statut: b.status,
+          })),
+          filename: 'export-topographie-magasins',
+          title: 'Export du Registre Topographique des Magasins',
+        };
+      }
+      case 'ocr': {
+        const saved = typeof window !== 'undefined' ? localStorage.getItem('archiveo_ocr_documents') : null;
+        const ocrDocs = saved ? JSON.parse(saved) : [];
+        return {
+          data: ocrDocs.map((d: any, idx: number) => ({
+            'N°': idx + 1,
+            Référence: d.reference,
+            Titre: d.title,
+            Catégorie: d.category,
+            Service: d.service,
+            'Précision OCR': `${d.accuracy}%`,
+            Fichier: d.fileName,
+            'Date Numérisation': d.date,
+          })),
+          filename: 'export-documents-ocr-plein-texte',
+          title: 'Export de la Base OCR & Plein Texte',
+        };
+      }
       case 'signatures': {
         const list = await fetchAllSignatures();
         return {
@@ -178,24 +217,26 @@ export default function ImportExportPage() {
             Titre: d.title,
             Type: d.typeId,
             Categorie: d.categoryId,
-            Service: d.serviceId || '',
+            Service: d.serviceId,
+            Confidentialite: d.confidentialityId,
             Statut: d.statusId,
-            Cree_Par: d.validatedBy || 'Utilisateur',
+            Taille_Mo: (d as any).fileSize ? ((d as any).fileSize / 1024 / 1024).toFixed(2) : '0.00',
             Date_Creation: new Date(d.createdAt).toLocaleDateString('fr-FR'),
           })),
           filename: 'export-documents-ged',
-          title: 'Export de la Base Documentaire GED',
+          title: 'Export du Registre des Documents GED',
         };
       }
     }
   };
 
-  const handleExport = async (format: string) => {
+  const handleExport = async (format: 'csv' | 'json' | 'xml' | 'excel' | 'pdf' | 'print') => {
     setIsExporting(true);
     try {
       const { data, filename, title } = await fetchEntityData(exportEntity);
-      if (data.length === 0) {
-        toast.error('Aucune donnée à exporter');
+
+      if (!data || data.length === 0) {
+        toast.error(`Aucune donnée à exporter pour le module sélectionné.`);
         return;
       }
 
@@ -228,7 +269,12 @@ export default function ImportExportPage() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
-      setSelectedFile(e.target.files[0]);
+      const file = e.target.files[0];
+      if (file.size > 50 * 1024 * 1024) {
+        toast.error('Le fichier dépasse la taille maximale de 50 Mo');
+        return;
+      }
+      setSelectedFile(file);
     }
   };
 
@@ -242,14 +288,14 @@ export default function ImportExportPage() {
       setIsImporting(false);
       toast.success(`Importation réussie du fichier « ${selectedFile.name} » (${(selectedFile.size / 1024).toFixed(1)} Ko) !`);
       setSelectedFile(null);
-    }, 1500);
+    }, 1200);
   };
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Import / Export & Impression"
-        subtitle="Exportez ou importez l'intégralité de vos documents, archives, courriers, prêts et paramètres"
+        title="Import / Export Universel"
+        subtitle="Exportez ou importez l'intégralité de vos documents, archives, topographie, OCR, prêts et paramètres"
         icon={<ArrowDownUp className="h-6 w-6" />}
       />
 
@@ -265,31 +311,33 @@ export default function ImportExportPage() {
 
         {/* Tab Export */}
         <TabsContent value="export" className="space-y-6">
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle className="text-lg">1. Sélectionnez le module à exporter</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-base font-bold">1. Sélectionnez le module à exporter</CardTitle>
+              <CardDescription className="text-xs">
                 Choisissez les données que vous souhaitez extraire ou imprimer.
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {[
                   { key: 'documents', label: 'Documents GED', desc: 'Fichiers, métadonnées, statuts et versions' },
-                  { key: 'signatures', label: 'Parapheur & Signatures', desc: 'Actes de signature, statuts, certificats eIDAS et SHA-256' },
-                  { key: 'archives', label: 'Archives physiques & numériques', desc: 'Emplacements, boîtes, conservation' },
-                  { key: 'correspondences', label: 'Courriers (Entrants/Sortants)', desc: 'Expéditeurs, destinataires, dates' },
+                  { key: 'topography', label: 'Topographie & Magasins', desc: 'Rayonnages, travées, cartons et emplacements' },
+                  { key: 'ocr', label: 'OCR & Plein Texte', desc: 'Documents scannés et index de texte intégral' },
+                  { key: 'signatures', label: 'Parapheur & Signatures', desc: 'Actes de signature, statuts, certificats eIDAS' },
+                  { key: 'archives', label: 'Archives Physiques & Dépôts', desc: 'Versements, boîtes, calendrier de rétention' },
+                  { key: 'correspondences', label: 'Courriers & Flux', desc: 'Expéditeurs, destinataires, dates' },
                   { key: 'loans', label: 'Prêts & Consultations', desc: 'Emprunteurs, échéances, motifs' },
                   { key: 'workflows', label: 'Circuits de Validation', desc: 'Étapes, validateurs, statuts' },
                   { key: 'parameters', label: 'Paramètres & Outils', desc: 'Types, catégories, dictionnaires' },
                   { key: 'users', label: 'Comptes Utilisateurs', desc: 'Identifiants, rôles, services' },
-                  { key: 'audit', label: 'Journal d’Audit Système', desc: 'Traçabilité, adresses IP, événements' },
+                  { key: 'audit', label: 'Journal d’Audit Métier', desc: 'Traçabilité, actions réalisées, conformité' },
                 ].map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     onClick={() => setExportEntity(item.key as any)}
-                    className={`flex flex-col text-left p-4 rounded-xl border-2 transition-all ${
+                    className={`flex flex-col text-left p-3.5 rounded-xl border-2 transition-all ${
                       exportEntity === item.key
                         ? 'border-primary bg-primary/5 shadow-sm ring-1 ring-primary/20'
                         : 'border-border hover:border-muted-foreground/30 hover:bg-muted/30'
@@ -299,40 +347,49 @@ export default function ImportExportPage() {
                       {item.label}
                       {exportEntity === item.key && <CheckCircle2 className="h-4 w-4 text-primary" />}
                     </span>
-                    <span className="text-xs text-muted-foreground mt-1 leading-relaxed">{item.desc}</span>
+                    <span className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                      {item.desc}
+                    </span>
                   </button>
                 ))}
               </div>
             </CardContent>
           </Card>
 
-          <div>
-            <h3 className="text-base font-semibold mb-3">2. Choisissez le format d'exportation</h3>
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {/* 2. Format d'exportation */}
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-base font-bold">2. Choisissez le format d'exportation</h2>
+              <p className="text-xs text-muted-foreground">
+                Génération instantanée dans le format universel de votre choix.
+              </p>
+            </div>
+
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
               {[
-                { format: 'pdf', label: 'Document PDF', icon: FileText, color: 'text-red-500 bg-red-50 dark:bg-red-950', desc: 'Rapport formaté avec en-tête et pagination' },
-                { format: 'excel', label: 'Tableur Excel (.xlsx)', icon: FileSpreadsheet, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950', desc: 'Tableau éditable avec colonnes structurées' },
-                { format: 'csv', label: 'Format CSV', icon: FileText, color: 'text-blue-500 bg-blue-50 dark:bg-blue-950', desc: 'Séparateurs universels compatibles tous SGBD' },
-                { format: 'json', label: 'Format JSON', icon: FileJson, color: 'text-amber-500 bg-amber-50 dark:bg-amber-950', desc: 'Format brut pour intégration API et scripts' },
-                { format: 'xml', label: 'Format XML', icon: FileCode, color: 'text-purple-500 bg-purple-50 dark:bg-purple-950', desc: 'Fichier XML normalisé pour échanges GED' },
-                { format: 'print', label: 'Impression Directe', icon: Printer, color: 'text-slate-600 bg-slate-100 dark:bg-slate-800', desc: 'Aperçu avant impression et mise en page papier' },
+                { format: 'excel' as const, label: 'Tableur Excel', desc: '.xlsx natif avec colonnes', icon: FileSpreadsheet, color: 'bg-emerald-500/10 text-emerald-600' },
+                { format: 'pdf' as const, label: 'Document PDF', desc: 'Rapport officiel structuré', icon: FileText, color: 'bg-red-500/10 text-red-600' },
+                { format: 'csv' as const, label: 'Fichier CSV', desc: 'Export tableur universel UTF-8', icon: FileText, color: 'bg-blue-500/10 text-blue-600' },
+                { format: 'json' as const, label: 'Structure JSON', desc: 'Export objet pour API & Backup', icon: FileJson, color: 'bg-amber-500/10 text-amber-600' },
+                { format: 'xml' as const, label: 'Bordereau XML', desc: 'Format standard interopérable', icon: FileCode, color: 'bg-purple-500/10 text-purple-600' },
+                { format: 'print' as const, label: 'Impression Directe', desc: 'Mise en page A4 officielle', icon: Printer, color: 'bg-slate-500/10 text-slate-700 dark:text-slate-300' },
               ].map((opt) => (
                 <Card
                   key={opt.format}
-                  className="cursor-pointer hover:shadow-lg hover:border-primary/40 transition-all group"
+                  className="cursor-pointer hover:shadow-md hover:border-primary/40 transition-all group"
                   onClick={() => !isExporting && handleExport(opt.format)}
                 >
-                  <CardContent className="flex flex-col items-center gap-3 p-6 text-center">
-                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl ${opt.color} group-hover:scale-110 transition-transform shadow-sm`}>
-                      <opt.icon className="h-7 w-7" />
+                  <CardContent className="flex flex-col items-center gap-2.5 p-4 text-center">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${opt.color} group-hover:scale-105 transition-transform shadow-sm`}>
+                      <opt.icon className="h-6 w-6" />
                     </div>
                     <div>
-                      <p className="font-semibold text-base">{opt.label}</p>
-                      <p className="text-xs text-muted-foreground mt-0.5">{opt.desc}</p>
+                      <p className="font-bold text-sm">{opt.label}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">{opt.desc}</p>
                     </div>
-                    <Button variant="outline" size="sm" className="gap-2 mt-1 w-full" disabled={isExporting}>
-                      {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />}
-                      Exporter en {opt.format.toUpperCase()}
+                    <Button variant="outline" size="sm" className="gap-1.5 mt-1 w-full text-xs" disabled={isExporting}>
+                      {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <Download className="h-3 w-3" />}
+                      Exporter
                     </Button>
                   </CardContent>
                 </Card>
@@ -343,22 +400,24 @@ export default function ImportExportPage() {
 
         {/* Tab Import */}
         <TabsContent value="import">
-          <Card>
+          <Card className="shadow-sm">
             <CardHeader>
-              <CardTitle>Importer des documents & métadonnées</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-base font-bold">Importer des documents & métadonnées</CardTitle>
+              <CardDescription className="text-xs">
                 Chargez un fichier de versement au format Excel (.xlsx), CSV, JSON ou XML.
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="max-w-md space-y-2">
-                <Label>Destination de l'importation</Label>
+                <Label className="text-xs font-semibold">Destination de l'importation</Label>
                 <Select value={importEntity} onValueChange={(v: any) => setImportEntity(v)}>
                   <SelectTrigger>
                     <SelectValue placeholder="Sélectionnez la destination..." />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="documents">Base Documentaire GED</SelectItem>
+                    <SelectItem value="topography">Topographie & Magasins d'Archives</SelectItem>
+                    <SelectItem value="ocr">Moteur OCR & Plein Texte</SelectItem>
                     <SelectItem value="signatures">Parapheur & Signatures Numériques</SelectItem>
                     <SelectItem value="archives">Registre des Archives</SelectItem>
                     <SelectItem value="correspondences">Registre des Courriers</SelectItem>
@@ -375,7 +434,7 @@ export default function ImportExportPage() {
                   <Upload className="h-8 w-8" />
                 </div>
                 <div className="text-center space-y-1">
-                  <p className="font-semibold text-base">
+                  <p className="font-semibold text-sm">
                     {selectedFile ? selectedFile.name : 'Glissez votre fichier ici ou parcourez votre ordinateur'}
                   </p>
                   <p className="text-xs text-muted-foreground">
@@ -388,18 +447,18 @@ export default function ImportExportPage() {
                     <input
                       id="file-upload"
                       type="file"
-                      accept=".csv,.json,.xlsx,.xml"
-                      className="hidden"
+                      accept=".xlsx,.csv,.json,.xml"
                       onChange={handleFileChange}
+                      className="hidden"
                     />
-                    <Button variant="outline" asChild className="cursor-pointer">
+                    <Button asChild variant="outline" className="cursor-pointer text-xs">
                       <span>Parcourir les fichiers</span>
                     </Button>
                   </label>
 
                   {selectedFile && (
-                    <Button onClick={handleProcessImport} disabled={isImporting} className="gap-2 bg-emerald-600 hover:bg-emerald-700 text-white">
-                      {isImporting && <Loader2 className="h-4 w-4 animate-spin" />}
+                    <Button onClick={handleProcessImport} disabled={isImporting} className="gap-2 text-xs">
+                      {isImporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Upload className="h-3.5 w-3.5" />}
                       Lancer l'importation
                     </Button>
                   )}

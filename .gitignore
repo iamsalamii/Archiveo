@@ -27,8 +27,13 @@ obj/
 # Environment & local secrets
 .env*.local
 .env
+*.key
+*.pfx
+*.pem
+*.cert
 appsettings.Development.json
 appsettings.Local.json
+appsettings.Production.json
 
 # Logs & Runtime data
 npm-debug.log*

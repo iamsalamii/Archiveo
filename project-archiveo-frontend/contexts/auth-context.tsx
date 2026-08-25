@@ -175,6 +175,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 matricule: userData.matricule,
                 serviceId: userData.serviceId,
             });
+            setUser((prev) => (prev && prev.id === userData.id ? { ...prev, ...userData } : prev));
             return true;
         } catch (error) {
             console.error('Erreur mise à jour utilisateur:', error);

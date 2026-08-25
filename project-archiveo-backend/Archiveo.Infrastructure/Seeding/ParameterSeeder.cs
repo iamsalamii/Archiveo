@@ -73,7 +73,11 @@ public static class ParameterSeeder
             new() { Code = "SMS_PARAM", Name = "Paramètres SMS", Icon = "MessageSquare", Color = "blue", Order = 53 },
             new() { Code = "WORKFLOW_PARAM", Name = "Paramètres workflow", Icon = "Workflow", Color = "green", Order = 54 },
             new() { Code = "OCR_PARAM", Name = "Paramètres OCR", Icon = "Scan", Color = "gray", Order = 55 },
-            new() { Code = "AI_PARAM", Name = "Paramètres IA", Icon = "Brain", Color = "purple", Order = 56 }
+            new() { Code = "AI_PARAM", Name = "Paramètres IA", Icon = "Brain", Color = "purple", Order = 56 },
+            new() { Code = "BUILDING", Name = "Bâtiments & Sites", Icon = "Building", Color = "orange", Order = 57 },
+            new() { Code = "ROOM", Name = "Magasins & Salles", Icon = "Warehouse", Color = "orange", Order = 58 },
+            new() { Code = "BAY", Name = "Travées & Rayons", Icon = "Layers", Color = "blue", Order = 59 },
+            new() { Code = "SHELF", Name = "Étagères & Tablettes", Icon = "Folder", Color = "blue", Order = 60 }
         };
 
         var existingGroups = await dbContext.ParameterGroups.Select(g => g.Code).ToListAsync();
@@ -101,6 +105,47 @@ public static class ParameterSeeder
             new() { GroupCode = "RECIPIENT", Code = "DEST_DAF", Name = "Direction Financière", Order = 2 },
             new() { GroupCode = "RECIPIENT", Code = "DEST_ALL", Name = "Tout le personnel", Order = 3 },
             new() { GroupCode = "RECIPIENT", Code = "DEST_EXT", Name = "Destinataires externes", Order = 4 },
+
+            // DIRECTION
+            new() { GroupCode = "DIRECTION", Code = "DIR_GEN", Name = "Direction Générale", Order = 1 },
+            new() { GroupCode = "DIRECTION", Code = "DIR_FIN", Name = "Direction Financière & Comptable", Order = 2 },
+            new() { GroupCode = "DIRECTION", Code = "DIR_RH", Name = "Direction des Ressources Humaines", Order = 3 },
+            new() { GroupCode = "DIRECTION", Code = "DIR_IT", Name = "Direction des Systèmes d'Information", Order = 4 },
+            new() { GroupCode = "DIRECTION", Code = "DIR_JUR", Name = "Direction Juridique & Conformité", Order = 5 },
+
+            // BUILDING / SITE
+            new() { GroupCode = "SITE", Code = "SITE_CENTRAL", Name = "Bâtiment Central — Siège", Order = 1 },
+            new() { GroupCode = "SITE", Code = "SITE_ANNEXE", Name = "Annexe Archives Nord", Order = 2 },
+            new() { GroupCode = "SITE", Code = "SITE_DEPOT", Name = "Dépôt Régional d'Archivage", Order = 3 },
+            new() { GroupCode = "BUILDING", Code = "BAT_A", Name = "Bâtiment Principal A", Order = 1 },
+            new() { GroupCode = "BUILDING", Code = "BAT_B", Name = "Bâtiment Annexe B", Order = 2 },
+            new() { GroupCode = "BUILDING", Code = "BAT_ARCH", Name = "Dépôt Central d'Archivage", Order = 3 },
+
+            // ROOM / LOCATION
+            new() { GroupCode = "LOCATION", Code = "MAG_A", Name = "Magasin A (Archives Courantes)", Order = 1 },
+            new() { GroupCode = "LOCATION", Code = "MAG_B", Name = "Magasin B (Fonds Historique)", Order = 2 },
+            new() { GroupCode = "LOCATION", Code = "SALLE_C", Name = "Salle d'Entreposage C", Order = 3 },
+            new() { GroupCode = "LOCATION", Code = "COFFRE", Name = "Magasin Sécurisé & Coffre-fort", Order = 4 },
+            new() { GroupCode = "ROOM", Code = "ROOM_A", Name = "Magasin A", Order = 1 },
+            new() { GroupCode = "ROOM", Code = "ROOM_B", Name = "Magasin B", Order = 2 },
+            new() { GroupCode = "ROOM", Code = "ROOM_C", Name = "Salle Historique C", Order = 3 },
+
+            // BAY (Travées)
+            new() { GroupCode = "BAY", Code = "T01", Name = "Travée T01", Order = 1 },
+            new() { GroupCode = "BAY", Code = "T02", Name = "Travée T02", Order = 2 },
+            new() { GroupCode = "BAY", Code = "T03", Name = "Travée T03", Order = 3 },
+            new() { GroupCode = "BAY", Code = "T04", Name = "Travée T04", Order = 4 },
+            new() { GroupCode = "BAY", Code = "T05", Name = "Travée T05", Order = 5 },
+
+            // SHELF (Étagères)
+            new() { GroupCode = "SHELF", Code = "E01", Name = "Étagère E01", Order = 1 },
+            new() { GroupCode = "SHELF", Code = "E02", Name = "Étagère E02", Order = 2 },
+            new() { GroupCode = "SHELF", Code = "E03", Name = "Étagère E03", Order = 3 },
+            new() { GroupCode = "SHELF", Code = "E04", Name = "Étagère E04", Order = 4 },
+            new() { GroupCode = "SHELF", Code = "E05", Name = "Étagère E05", Order = 5 },
+
+            // EMAIL_PARAM
+            new() { GroupCode = "EMAIL_PARAM", Code = "DEMO_EMAIL", Name = "contact@archiveo.enterprise", Description = "Email de réception des demandes de démo", Order = 1 },
 
             // DOC_TYPE
             new() { GroupCode = "DOC_TYPE", Code = "CONTRAT", Name = "Contrat", Order = 1 },
@@ -132,6 +177,31 @@ public static class ParameterSeeder
             new() { GroupCode = "LANGUAGE", Code = "FR", Name = "Français", Order = 1 },
             new() { GroupCode = "LANGUAGE", Code = "EN", Name = "Anglais", Order = 2 },
             new() { GroupCode = "LANGUAGE", Code = "ES", Name = "Espagnol", Order = 3 },
+            new() { GroupCode = "LANGUAGE", Code = "AR", Name = "Arabe", Order = 4 },
+            new() { GroupCode = "LANGUAGE", Code = "DE", Name = "Allemand", Order = 5 },
+
+            // COUNTRY (Liste complète et internationale)
+            new() { GroupCode = "COUNTRY", Code = "CI", Name = "Côte d'Ivoire", Order = 1 },
+            new() { GroupCode = "COUNTRY", Code = "FR", Name = "France", Order = 2 },
+            new() { GroupCode = "COUNTRY", Code = "SN", Name = "Sénégal", Order = 3 },
+            new() { GroupCode = "COUNTRY", Code = "CM", Name = "Cameroun", Order = 4 },
+            new() { GroupCode = "COUNTRY", Code = "GA", Name = "Gabon", Order = 5 },
+            new() { GroupCode = "COUNTRY", Code = "ML", Name = "Mali", Order = 6 },
+            new() { GroupCode = "COUNTRY", Code = "BF", Name = "Burkina Faso", Order = 7 },
+            new() { GroupCode = "COUNTRY", Code = "TG", Name = "Togo", Order = 8 },
+            new() { GroupCode = "COUNTRY", Code = "BJ", Name = "Bénin", Order = 9 },
+            new() { GroupCode = "COUNTRY", Code = "GN", Name = "Guinée", Order = 10 },
+            new() { GroupCode = "COUNTRY", Code = "CG", Name = "Congo", Order = 11 },
+            new() { GroupCode = "COUNTRY", Code = "CD", Name = "RD Congo", Order = 12 },
+            new() { GroupCode = "COUNTRY", Code = "MA", Name = "Maroc", Order = 13 },
+            new() { GroupCode = "COUNTRY", Code = "TN", Name = "Tunisie", Order = 14 },
+            new() { GroupCode = "COUNTRY", Code = "DZ", Name = "Algérie", Order = 15 },
+            new() { GroupCode = "COUNTRY", Code = "BE", Name = "Belgique", Order = 16 },
+            new() { GroupCode = "COUNTRY", Code = "CH", Name = "Suisse", Order = 17 },
+            new() { GroupCode = "COUNTRY", Code = "CA", Name = "Canada", Order = 18 },
+            new() { GroupCode = "COUNTRY", Code = "US", Name = "États-Unis", Order = 19 },
+            new() { GroupCode = "COUNTRY", Code = "GB", Name = "Royaume-Uni", Order = 20 },
+            new() { GroupCode = "COUNTRY", Code = "DE", Name = "Allemagne", Order = 21 },
         };
 
         var existingItems = await dbContext.ParameterItems.Select(i => i.GroupCode + "_" + i.Code).ToListAsync();

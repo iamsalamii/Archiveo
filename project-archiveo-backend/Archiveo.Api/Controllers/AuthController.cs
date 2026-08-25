@@ -25,7 +25,7 @@ public class AuthController : ControllerBase
     {
         var response = await _authService.LoginAsync(request);
         if (response == null)
-            return Unauthorized(new { message = "Email ou mot de passe incorrect" });
+            return Unauthorized(new { message = "Identifiants invalides" });
 
         return Ok(response);
     }

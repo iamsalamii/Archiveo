@@ -1,31 +1,39 @@
 // ============================================================
 // Internationalization — all UI strings externalized.
-// Replace the dictionary loader with an API call later if needed.
 // ============================================================
 
 export type Locale = 'fr' | 'en';
 
 export const translations = {
   fr: {
-    // Navigation
+    // Navigation Sections
+    'nav.section.pilotage': 'Pilotage & Recherche',
+    'nav.section.documentaire': 'Espace Documentaire',
+    'nav.section.conservation': 'Conservation & Dépôts',
+    'nav.section.conformite': 'Circuits & Conformité',
+    'nav.section.administration': 'Configuration & Administration',
+
+    // Navigation Items
     'nav.dashboard': 'Tableau de bord',
-    'nav.documents': 'Documents',
-    'nav.archives': 'Archives',
-    'nav.documentalist': 'Documentaliste',
-    'nav.search': 'Recherche',
-    'nav.users': 'Utilisateurs',
-    'nav.profile': 'Mon profil',
-    'nav.settings': 'Paramètres',
+    'nav.search': 'Recherche multicritère',
+    'nav.ocrSearch': 'Recherche OCR & Texte',
+    'nav.documents': 'Documents GED',
+    'nav.correspondence': 'Courriers & Flux',
+    'nav.documentalist': 'Espace Documentaliste',
+    'nav.archives': 'Archives & Versements',
+    'nav.topography': 'Topographie & QR Codes',
+    'nav.loans': 'Prêts & Consultations',
+    'nav.workflows': 'Circuits de Validation',
+    'nav.signatures': 'Parapheur Électronique',
+    'nav.security': 'Sécurité & Rôles RBAC',
+    'nav.audit': 'Journal d’Audit',
+    'nav.outils': 'Outils & Paramètres',
+    'nav.users': 'Utilisateurs & Profils',
+    'nav.importExport': 'Import / Export Universel',
+    'nav.settings': 'Paramètres Généraux',
+    'nav.profile': 'Mon Profil',
     'nav.organization': 'Organisation',
-    'nav.audit': 'Audit',
     'nav.notifications': 'Notifications',
-    'nav.outils': 'Outils',
-    'nav.importExport': 'Import / Export',
-    'nav.security': 'Sécurité',
-    'nav.correspondence': 'Courriers',
-    'nav.loans': 'Prêts',
-    'nav.workflows': 'Workflows',
-    'nav.signatures': 'Parapheur & Signatures',
 
     // Common
     'common.save': 'Enregistrer',
@@ -126,24 +134,34 @@ export const translations = {
     'settings.systemMode': 'Mode système',
   },
   en: {
+    // Navigation Sections
+    'nav.section.pilotage': 'Tracking & Search',
+    'nav.section.documentaire': 'Document Workspace',
+    'nav.section.conservation': 'Retention & Depository',
+    'nav.section.conformite': 'Workflows & Compliance',
+    'nav.section.administration': 'System & Administration',
+
+    // Navigation Items
     'nav.dashboard': 'Dashboard',
-    'nav.documents': 'Documents',
-    'nav.archives': 'Archives',
-    'nav.documentalist': 'Documentalist',
-    'nav.search': 'Search',
-    'nav.users': 'Users',
-    'nav.profile': 'My profile',
-    'nav.settings': 'Settings',
-    'nav.organization': 'Organization',
-    'nav.audit': 'Audit',
-    'nav.notifications': 'Notifications',
-    'nav.outils': 'Tools',
-    'nav.importExport': 'Import / Export',
-    'nav.security': 'Security',
-    'nav.correspondence': 'Correspondence',
-    'nav.loans': 'Loans',
-    'nav.workflows': 'Workflows',
+    'nav.search': 'Advanced Search',
+    'nav.ocrSearch': 'OCR & Text Search',
+    'nav.documents': 'EDM Documents',
+    'nav.correspondence': 'Mail & Flows',
+    'nav.documentalist': 'Documentalist Desk',
+    'nav.archives': 'Archives & Transfers',
+    'nav.topography': 'Topography & QR Codes',
+    'nav.loans': 'Loans & Consultations',
+    'nav.workflows': 'Approval Workflows',
     'nav.signatures': 'E-Signatures & Parapheur',
+    'nav.security': 'Security & RBAC Roles',
+    'nav.audit': 'Audit Trail',
+    'nav.outils': 'Tools & Parameters',
+    'nav.users': 'Users & Profiles',
+    'nav.importExport': 'Universal Import / Export',
+    'nav.settings': 'General Settings',
+    'nav.profile': 'My Profile',
+    'nav.organization': 'Organization',
+    'nav.notifications': 'Notifications',
 
     'common.save': 'Save',
     'common.cancel': 'Cancel',

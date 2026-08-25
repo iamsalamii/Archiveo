@@ -7,6 +7,14 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+    Dialog,
+    DialogContent,
+    DialogHeader,
+    DialogTitle,
+    DialogDescription,
+    DialogFooter,
+} from '@/components/ui/dialog';
+import {
     Table,
     TableBody,
     TableCell,
@@ -15,6 +23,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CheckCircle2, RefreshCw, Undo2, Trash2, BookOpen, Clock, Calendar, HandHelping, Plus, Eye } from 'lucide-react';
 import { useParameters } from '@/contexts/parameters-context';
 import {
     fetchLoans,
@@ -28,7 +37,6 @@ import {
 } from '@/services/loans-api';
 import { LoanFormDialog } from '@/components/loans/loan-form-dialog';
 import { ConsultationFormDialog } from '@/components/loans/consultation-form-dialog';
-import { HandHelping, Plus, Eye, Undo2, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 function formatDate(dateStr: string): string {
@@ -113,20 +121,28 @@ export default function LoansPage() {
         }
     }, [activeTab, loans, consultations, getItemName]);
 
-    const handleReturn = async (id: string) => {
-        if (!confirm('Marquer ce prêt comme retourné ?')) return;
+    const [returnTargetLoan, setReturnTargetLoan] = useState<LoanApi | null>(null);
+    const [returnLoading, setReturnLoading] = useState(false);
+
+    const handleConfirmReturn = async () => {
+        if (!returnTargetLoan) return;
+        const id = returnTargetLoan.id;
         const previous = [...loans];
+        setReturnLoading(true);
         // Optimistic UI
         setLoans((prev) =>
             prev.map((l) => (l.id === id ? { ...l, status: 'returned' as const, returnedDate: new Date().toISOString() } : l))
         );
-        toast.success('Prêt marqué comme retourné');
+        toast.success('Prêt marqué comme retourné avec succès en magasin');
+        setReturnTargetLoan(null);
         try {
             await returnLoan(id);
             load(true);
         } catch {
             setLoans(previous);
-            toast.error('Erreur lors du retour');
+            toast.error('Erreur lors de l’enregistrement du retour');
+        } finally {
+            setReturnLoading(false);
         }
     };
 
@@ -298,7 +314,7 @@ export default function LoansPage() {
                                                                     <Button
                                                                         variant="ghost"
                                                                         size="icon"
-                                                                        onClick={() => handleReturn(l.id)}
+                                                                        onClick={() => setReturnTargetLoan(l)}
                                                                         title="Marquer comme retourné"
                                                                     >
                                                                         <Undo2 className="h-4 w-4 text-emerald-600" />
@@ -400,6 +416,57 @@ export default function LoansPage() {
                 onOpenChange={setConsultFormOpen}
                 onSaved={() => load(true)}
             />
+
+            {/* Modal de Confirmation de Retour de Prêt */}
+            <Dialog open={!!returnTargetLoan} onOpenChange={(open) => !open && setReturnTargetLoan(null)}>
+                <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <Undo2 className="h-5 w-5 text-emerald-600" />
+                            Confirmer le retour de document
+                        </DialogTitle>
+                        <DialogDescription>
+                            Validation de la réintégration de la pièce physique dans le magasin d'archives.
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {returnTargetLoan && (
+                        <div className="space-y-3 py-2 text-xs">
+                            <div className="rounded-lg bg-muted/50 p-3 space-y-1.5 border">
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Référence du prêt :</span>
+                                    <span className="font-mono font-bold text-foreground">{returnTargetLoan.reference}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Document :</span>
+                                    <span className="font-semibold text-foreground truncate max-w-[200px]">{returnTargetLoan.documentTitle || '—'}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Emprunteur :</span>
+                                    <span className="text-foreground">{returnTargetLoan.borrowerName}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                    <span className="text-muted-foreground">Date d'échéance :</span>
+                                    <span className="font-mono text-muted-foreground">{formatDate(returnTargetLoan.dueDate)}</span>
+                                </div>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                                En confirmant, le statut de ce prêt passera à « Retourné » et la traçabilité sera consignée dans le journal d'audit.
+                            </p>
+                        </div>
+                    )}
+
+                    <DialogFooter className="gap-2 sm:gap-0">
+                        <Button variant="outline" onClick={() => setReturnTargetLoan(null)} disabled={returnLoading}>
+                            Annuler
+                        </Button>
+                        <Button onClick={handleConfirmReturn} disabled={returnLoading} className="bg-emerald-600 hover:bg-emerald-700 text-white gap-2">
+                            <CheckCircle2 className="h-4 w-4" />
+                            {returnLoading ? 'Enregistrement...' : 'Confirmer le retour'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

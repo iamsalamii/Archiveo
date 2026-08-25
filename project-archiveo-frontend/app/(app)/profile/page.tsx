@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
-
+import React, { useState, useEffect } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -16,16 +15,102 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from '@/contexts/theme-context';
 import { useI18n } from '@/contexts/i18n-context';
 import { toast } from 'sonner';
-import { UserCircle, Lock, Bell, Globe, Monitor, History } from 'lucide-react';
+import { UserCircle, Lock, Bell, Globe, Monitor, History, Loader2, KeyRound } from 'lucide-react';
 
 export default function ProfilePage() {
-  const { user } = useAuth();
+  const { user, updateUser, changePassword } = useAuth();
   const { theme, setTheme } = useTheme();
   const { locale, setLocale } = useI18n();
 
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
+  const [serviceId, setServiceId] = useState('');
+  const [directionId, setDirectionId] = useState('');
+  const [savingInfo, setSavingInfo] = useState(false);
+
+  // Password state
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [savingPassword, setSavingPassword] = useState(false);
+
+  useEffect(() => {
+    if (user) {
+      setFirstName(user.firstName || '');
+      setLastName(user.lastName || '');
+      setEmail(user.email || '');
+      setPhone(user.phone || '');
+      setServiceId(user.serviceId || '');
+      setDirectionId(user.directionId || '');
+    }
+  }, [user]);
+
   if (!user) return null;
 
-  const initials = `${user.firstName[0]}${user.lastName[0]}`;
+  const initials = `${(user.firstName || 'A')[0]}${(user.lastName || 'U')[0]}`.toUpperCase();
+
+  const handleSaveInfo = async () => {
+    if (!firstName.trim() || !lastName.trim() || !email.trim()) {
+      toast.error('Le prénom, le nom et l’adresse email sont obligatoires.');
+      return;
+    }
+    setSavingInfo(true);
+    try {
+      const success = await updateUser({
+        ...user,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim(),
+        phone: phone.trim(),
+        serviceId: serviceId || undefined,
+        directionId: directionId || undefined,
+      });
+
+      if (success) {
+        toast.success('Profil mis à jour avec succès !');
+      } else {
+        toast.error('Erreur lors de la mise à jour du profil');
+      }
+    } catch (e) {
+      toast.error((e as Error).message || 'Erreur lors de la mise à jour');
+    } finally {
+      setSavingInfo(false);
+    }
+  };
+
+  const handleSavePassword = async () => {
+    if (!currentPassword) {
+      toast.error('Veuillez saisir votre mot de passe actuel.');
+      return;
+    }
+    if (!newPassword || newPassword.length < 8) {
+      toast.error('Le nouveau mot de passe doit contenir au moins 8 caractères.');
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error('La confirmation du mot de passe ne correspond pas.');
+      return;
+    }
+
+    setSavingPassword(true);
+    try {
+      const success = await changePassword(currentPassword, newPassword);
+      if (success) {
+        toast.success('Votre mot de passe a été modifié avec succès !');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        toast.error('Mot de passe actuel incorrect ou non conforme.');
+      }
+    } catch (e) {
+      toast.error((e as Error).message || 'Erreur lors du changement de mot de passe');
+    } finally {
+      setSavingPassword(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -57,9 +142,9 @@ export default function ProfilePage() {
           </Avatar>
           <div>
             <h2 className="text-xl font-bold">{user.firstName} {user.lastName}</h2>
-            <p className="text-sm text-muted-foreground">{user.function}</p>
+            <p className="text-sm text-muted-foreground">{user.function || 'Collaborateur Archivéo'}</p>
             <div className="mt-2 flex items-center gap-2">
-              <Badge variant="outline">{user.matricule}</Badge>
+              <Badge variant="outline">{user.matricule || 'MAT-001'}</Badge>
               <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400">
                 {user.active ? 'Actif' : 'Inactif'}
               </Badge>
@@ -89,75 +174,106 @@ export default function ProfilePage() {
 
         <TabsContent value="info">
           <Card>
-            <CardHeader><CardTitle>Informations personnelles</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Informations personnelles</CardTitle>
+              <CardDescription className="text-xs">Modifiez vos informations de profil et vos coordonnées professionnelles.</CardDescription>
+            </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Prénom</Label>
-                  <Input defaultValue={user.firstName} />
+              <div className="grid gap-4 sm:grid-cols-2 text-xs">
+                <div className="space-y-1.5">
+                  <Label>Prénom *</Label>
+                  <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Prénom" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Nom</Label>
-                  <Input defaultValue={user.lastName} />
+                <div className="space-y-1.5">
+                  <Label>Nom *</Label>
+                  <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Nom de famille" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Email</Label>
-                  <Input defaultValue={user.email} />
+                <div className="space-y-1.5">
+                  <Label>Email professionnel *</Label>
+                  <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="adresse@entreprise.com" />
                 </div>
-                <div className="space-y-2">
+                <div className="space-y-1.5">
                   <Label>Téléphone</Label>
-                  <Input defaultValue={user.phone ?? ''} />
+                  <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+225 07 00 00 00" />
                 </div>
-                <div className="space-y-2">
-                  <Label>Service</Label>
-                  <ParameterSelect groupCode="SERVICE" value={user.serviceId ?? ''} onValueChange={() => {}} />
+                <div className="space-y-1.5">
+                  <Label>Service d'affectation</Label>
+                  <ParameterSelect groupCode="SERVICE" value={serviceId} onValueChange={setServiceId} />
                 </div>
-                <div className="space-y-2">
-                  <Label>Direction</Label>
-                  <ParameterSelect groupCode="DIRECTION" value={user.directionId ?? ''} onValueChange={() => {}} />
+                <div className="space-y-1.5">
+                  <Label>Direction de rattachement</Label>
+                  <ParameterSelect groupCode="DIRECTION" value={directionId} onValueChange={setDirectionId} />
                 </div>
               </div>
-              <Button onClick={() => toast.success('Profil mis à jour')}>Enregistrer</Button>
+              <Button onClick={handleSaveInfo} disabled={savingInfo} className="gap-2 text-xs">
+                {savingInfo && <Loader2 className="h-4 w-4 animate-spin" />}
+                Enregistrer les modifications
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="password">
           <Card>
-            <CardHeader><CardTitle>Changer le mot de passe</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Mot de passe actuel</Label>
-                <Input type="password" />
+            <CardHeader>
+              <CardTitle className="text-base flex items-center gap-2">
+                <KeyRound className="h-4 w-4 text-primary" /> Changer le mot de passe
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Pour sécuriser votre compte, utilisez un mot de passe robuste d'au moins 8 caractères.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4 max-w-lg">
+              <div className="space-y-1.5 text-xs">
+                <Label>Mot de passe actuel *</Label>
+                <Input
+                  type="password"
+                  value={currentPassword}
+                  onChange={(e) => setCurrentPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                />
               </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label>Nouveau mot de passe</Label>
-                  <Input type="password" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Confirmer</Label>
-                  <Input type="password" />
-                </div>
+              <div className="space-y-1.5 text-xs">
+                <Label>Nouveau mot de passe *</Label>
+                <Input
+                  type="password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Minimum 8 caractères"
+                />
               </div>
-              <Button onClick={() => toast.success('Mot de passe modifié')}>Changer le mot de passe</Button>
+              <div className="space-y-1.5 text-xs">
+                <Label>Confirmer le nouveau mot de passe *</Label>
+                <Input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  placeholder="Répétez le nouveau mot de passe"
+                />
+              </div>
+              <Button onClick={handleSavePassword} disabled={savingPassword} className="gap-2 text-xs">
+                {savingPassword && <Loader2 className="h-4 w-4 animate-spin" />}
+                Changer le mot de passe
+              </Button>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="preferences">
           <Card>
-            <CardHeader><CardTitle>Préférences</CardTitle></CardHeader>
+            <CardHeader>
+              <CardTitle className="text-base">Préférences d'affichage & Notifications</CardTitle>
+            </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-2">
-                <Label>Langue</Label>
+                <Label className="text-xs font-semibold">Langue de l'interface</Label>
                 <div className="flex gap-2">
                   <Button variant={locale === 'fr' ? 'default' : 'outline'} size="sm" onClick={() => setLocale('fr')}>Français</Button>
                   <Button variant={locale === 'en' ? 'default' : 'outline'} size="sm" onClick={() => setLocale('en')}>English</Button>
                 </div>
               </div>
               <div className="space-y-2">
-                <Label>Thème</Label>
+                <Label className="text-xs font-semibold">Thème visuel</Label>
                 <div className="flex gap-2">
                   {([
                     { val: 'light' as const, label: 'Clair' },
@@ -190,21 +306,18 @@ export default function ProfilePage() {
 
         <TabsContent value="sessions">
           <Card>
-            <CardHeader><CardTitle>Sessions ouvertes</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Sessions actives</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {[
-                { device: 'Chrome — Windows', ip: '10.0.0.12', current: true, last: 'Maintenant' },
-                { device: 'Safari — iPhone', ip: '10.0.0.45', current: false, last: 'Il y a 2h' },
+                { device: 'Navigateur Web — Actuel', ip: 'Poste local', current: true, last: 'Connecté' },
               ].map((s, i) => (
                 <div key={i} className="flex items-center justify-between rounded-lg border p-3">
                   <div>
                     <p className="text-sm font-medium">{s.device}</p>
                     <p className="text-xs text-muted-foreground">{s.ip} — {s.last}</p>
                   </div>
-                  {s.current ? (
-                    <Badge>Session actuelle</Badge>
-                  ) : (
-                    <Button variant="ghost" size="sm">Déconnecter</Button>
+                  {s.current && (
+                    <Badge className="bg-emerald-100 text-emerald-800 border-emerald-300">Session active</Badge>
                   )}
                 </div>
               ))}
@@ -214,18 +327,15 @@ export default function ProfilePage() {
 
         <TabsContent value="log">
           <Card>
-            <CardHeader><CardTitle>Journal d'activité</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Historique de mes actions</CardTitle></CardHeader>
             <CardContent className="space-y-2">
               {[
-                { action: 'Connexion', date: 'Aujourd\'hui 09:12', ip: '10.0.0.12' },
-                { action: 'Modification document DOC-2024-0001', date: 'Aujourd\'hui 10:30', ip: '10.0.0.12' },
-                { action: 'Export PDF', date: 'Hier 14:22', ip: '10.0.0.12' },
-                { action: 'Connexion', date: 'Hier 08:45', ip: '10.0.0.12' },
+                { action: 'Connexion réussie', date: 'Session en cours', ip: 'Sécurisé' },
               ].map((entry, i) => (
                 <div key={i} className="flex items-center gap-3 rounded-lg border p-2.5 text-sm">
                   <History className="h-4 w-4 text-muted-foreground" />
                   <span className="font-medium">{entry.action}</span>
-                  <span className="text-muted-foreground ml-auto">{entry.date} • {entry.ip}</span>
+                  <span className="text-muted-foreground ml-auto">{entry.date}</span>
                 </div>
               ))}
             </CardContent>
@@ -329,31 +439,83 @@ function SignatureProfileSettings({ userId, userName }: { userId: string; userNa
     }
   };
 
+  const [calligraphyIndex, setCalligraphyIndex] = useState(0);
+
   const generateCalligraphy = () => {
     const canvas = document.createElement('canvas');
-    canvas.width = 400;
-    canvas.height = 140;
+    canvas.width = 440;
+    canvas.height = 160;
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
+    // Fond blanc propre
     ctx.fillStyle = '#ffffff';
-    ctx.fillRect(0, 0, 400, 140);
+    ctx.fillRect(0, 0, 440, 160);
 
-    ctx.font = 'italic 34px "Brush Script MT", "Caveat", "Dancing Script", cursive';
-    ctx.fillStyle = '#1e3a8a';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(userName, 200, 60);
+    const nextIndex = (calligraphyIndex + 1) % 3;
+    setCalligraphyIndex(nextIndex);
 
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(80, 95);
-    ctx.quadraticCurveTo(200, 110, 320, 90);
-    ctx.stroke();
+    const nameToRender = userName && userName.trim().length > 0 ? userName : 'Utilisateur Archivéo';
+
+    if (nextIndex === 0) {
+      // Style 1 : Cursive élégante bleue avec trait sous-jacent
+      ctx.font = 'italic bold 34px "Brush Script MT", "Segoe Script", "Dancing Script", cursive, sans-serif';
+      ctx.fillStyle = '#1e3a8a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(nameToRender, 220, 65);
+
+      ctx.strokeStyle = '#2563eb';
+      ctx.lineWidth = 2.5;
+      ctx.beginPath();
+      ctx.moveTo(60, 105);
+      ctx.quadraticCurveTo(220, 125, 380, 95);
+      ctx.stroke();
+    } else if (nextIndex === 1) {
+      // Style 2 : Signature dynamique expressive avec arabesque
+      ctx.font = 'italic bold 32px "Lucida Handwriting", "Segoe Script", cursive, sans-serif';
+      ctx.fillStyle = '#0f172a';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(nameToRender, 210, 60);
+
+      ctx.strokeStyle = '#0284c7';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(80, 110);
+      ctx.bezierCurveTo(150, 80, 290, 140, 360, 100);
+      ctx.stroke();
+
+      // Petit paraphe d'ornement
+      ctx.beginPath();
+      ctx.arc(365, 95, 4, 0, 2 * Math.PI);
+      ctx.fillStyle = '#0284c7';
+      ctx.fill();
+    } else {
+      // Style 3 : Signature diplomatique / officielle foncée
+      ctx.font = 'italic 30px "Palatino Linotype", "Book Antiqua", "Georgia", serif';
+      ctx.fillStyle = '#1e293b';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(nameToRender, 220, 55);
+
+      ctx.font = '9px sans-serif';
+      ctx.fillStyle = '#64748b';
+      ctx.fillText('SIGNATURE ÉLECTRONIQUE PROBANTE', 220, 90);
+
+      ctx.strokeStyle = '#0f172a';
+      ctx.lineWidth = 1.5;
+      ctx.strokeRect(30, 20, 380, 110);
+    }
 
     const dataUrl = canvas.toDataURL('image/png');
     setSignatureData(dataUrl);
+    try {
+      localStorage.setItem('archiveo_signature_data_' + userId, dataUrl);
+    } catch {
+      // ignore
+    }
+    toast.success(`Style calligraphique ${nextIndex + 1} appliqué et enregistré !`);
   };
 
   return (

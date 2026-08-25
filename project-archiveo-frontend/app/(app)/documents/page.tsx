@@ -18,7 +18,8 @@ import {
   fetchDocuments, deleteDocument, validateDocument, downloadDocument, DocumentApi,
 } from '@/services/documents-api';
 import { DocumentFormDialog } from '@/components/documents/document-form-dialog';
-import { FileText, Plus, Search, Download, CheckCircle2, Trash2, Pencil } from 'lucide-react';
+import { DocumentViewerDialog, type DocumentViewerItem } from '@/components/documents/document-viewer-dialog';
+import { FileText, Plus, Search, Download, CheckCircle2, Trash2, Pencil, Eye } from 'lucide-react';
 import { toast } from 'sonner';
 
 function formatSize(bytes: number): string {
@@ -48,6 +49,10 @@ export default function DocumentsPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editing, setEditing] = useState<DocumentApi | null>(null);
 
+  // Visionneuse Documentaire In-App
+  const [viewerDoc, setViewerDoc] = useState<DocumentViewerItem | null>(null);
+  const [viewerOpen, setViewerOpen] = useState(false);
+
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     try {
@@ -75,7 +80,8 @@ export default function DocumentsPage() {
   }, [docs, search, typeFilter, statusFilter]);
 
   const exportData = useMemo(() => {
-    return filtered.map((d) => ({
+    return filtered.map((d, idx) => ({
+      'N°': idx + 1,
       Référence: d.reference,
       Titre: d.title,
       Type: getItemName('DOC_TYPE', d.typeId) || d.typeId,
@@ -90,7 +96,7 @@ export default function DocumentsPage() {
   const handleDelete = async (id: string) => {
     if (!confirm('Supprimer ce document ?')) return;
     const previousDocs = [...docs];
-    // Optimistic UI
+    // Optimistic UI : suppression instantanée du tableau
     setDocs((prev) => prev.filter((d) => d.id !== id));
     toast.success('Document supprimé');
     try {
@@ -104,7 +110,7 @@ export default function DocumentsPage() {
 
   const handleValidate = async (id: string) => {
     const previousDocs = [...docs];
-    // Optimistic UI
+    // Optimistic UI : validation instantanée
     setDocs((prev) =>
       prev.map((d) => (d.id === id ? { ...d, validated: true, statusId: 'VALIDE' } : d))
     );
@@ -124,6 +130,28 @@ export default function DocumentsPage() {
     } catch {
       toast.error('Aucun fichier associé');
     }
+  };
+
+  const handleOpenViewer = (d: DocumentApi) => {
+    setViewerDoc({
+      id: d.id,
+      title: d.title,
+      reference: d.reference,
+      fileName: d.fileName,
+      mimeType: d.mimeType,
+      fileSize: d.fileSize,
+      category: getItemName('DOC_CATEGORY', d.categoryId) || d.categoryId,
+      type: getItemName('DOC_TYPE', d.typeId) || d.typeId,
+      confidentiality: d.confidentialityId ? (getItemName('CONFIDENTIALITY', d.confidentialityId) || d.confidentialityId) : 'Standard',
+      service: getItemName('SERVICE', d.serviceId) || d.serviceId,
+      createdAt: d.createdAt,
+      validated: d.validated,
+      validatedBy: d.validated ? 'Direction' : undefined,
+      validatedAt: d.createdAt,
+      version: d.version,
+      tags: typeof d.tags === 'string' ? [d.tags] : Array.isArray(d.tags) ? d.tags : [],
+    });
+    setViewerOpen(true);
   };
 
   return (
@@ -150,14 +178,14 @@ export default function DocumentsPage() {
           filterSummary: `${filtered.length} document(s) sélectionné(s)`,
         }}
         actions={
-          <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-2">
+          <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-2 shadow-sm font-medium">
             <Plus className="h-4 w-4" /> Nouveau document
           </Button>
         }
       />
 
       {/* Filtres */}
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
@@ -182,13 +210,13 @@ export default function DocumentsPage() {
             </SelectContent>
           </Select>
           <div className="flex items-center text-sm font-medium text-muted-foreground">
-            {filtered.length} document(s)
+            {filtered.length} document(s) répertorié(s)
           </div>
         </CardContent>
       </Card>
 
       {/* Table */}
-      <Card>
+      <Card className="shadow-sm">
         <CardContent className="p-0">
           {loading ? (
             <div className="space-y-2 p-4">
@@ -218,7 +246,9 @@ export default function DocumentsPage() {
                   filtered.map((d) => (
                     <TableRow key={d.id} className="hover:bg-muted/30 transition-colors">
                       <TableCell className="font-mono text-xs font-semibold">{d.reference}</TableCell>
-                      <TableCell className="font-medium">{d.title}</TableCell>
+                      <TableCell className="font-medium cursor-pointer hover:text-primary transition-colors" onClick={() => handleOpenViewer(d)}>
+                        {d.title}
+                      </TableCell>
                       <TableCell>{getItemName('DOC_TYPE', d.typeId)}</TableCell>
                       <TableCell>{getItemName('SERVICE', d.serviceId)}</TableCell>
                       <TableCell>
@@ -229,6 +259,15 @@ export default function DocumentsPage() {
                       <TableCell className="text-xs text-muted-foreground">{formatSize(d.fileSize)}</TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleOpenViewer(d)}
+                            className="text-primary hover:bg-primary/10"
+                            title="Consulter dans la visionneuse in-app"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
                           {d.fileName && (
                             <Button variant="ghost" size="icon" onClick={() => handleDownload(d)} title="Télécharger">
                               <Download className="h-4 w-4" />
@@ -256,11 +295,19 @@ export default function DocumentsPage() {
         </CardContent>
       </Card>
 
+      {/* Formulaire Dialog */}
       <DocumentFormDialog
         open={formOpen}
         onOpenChange={setFormOpen}
         document={editing}
         onSaved={() => load(true)}
+      />
+
+      {/* Visionneuse Documentaire In-App */}
+      <DocumentViewerDialog
+        open={viewerOpen}
+        onOpenChange={setViewerOpen}
+        document={viewerDoc}
       />
     </div>
   );

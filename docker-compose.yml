@@ -1,0 +1,88 @@
+version: '3.8'
+
+services:
+  # ============================================================================
+  # Base de données PostgreSQL
+  # ============================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: archiveo_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-archiveo_db}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Salamsafe52@$}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - archiveo_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-archiveo_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - archiveo_network
+
+  # ============================================================================
+  # Backend API - ASP.NET Core (.NET 9)
+  # ============================================================================
+  backend:
+    build:
+      context: ./project-archiveo-backend
+      dockerfile: Dockerfile
+    container_name: archiveo_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-archiveo_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-Salamsafe52@$}
+      - Jwt__Key=${JWT_KEY:-ArchiveoSuperSecretKeyForJwtTokenGeneration2024SecureKey!}
+      - Jwt__Issuer=${JWT_ISSUER:-ArchiveoApi}
+      - Jwt__Audience=${JWT_AUDIENCE:-ArchiveoClient}
+      - Jwt__ExpiryInDays=7
+      - SeedAdmin__Password=${ADMIN_PASSWORD:-Admin123!}
+      - Storage__UploadPath=/app/uploads
+    ports:
+      - "5000:5000"
+    volumes:
+      - archiveo_uploads:/app/uploads
+    networks:
+      - archiveo_network
+
+  # ============================================================================
+  # Frontend - Next.js (React / TypeScript)
+  # ============================================================================
+  frontend:
+    build:
+      context: ./project-archiveo-frontend
+      dockerfile: Dockerfile
+      args:
+        - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+    container_name: archiveo_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
+    ports:
+      - "3000:3000"
+    networks:
+      - archiveo_network
+
+# ==============================================================================
+# Volumes & Réseaux persistants
+# ==============================================================================
+volumes:
+  archiveo_postgres_data:
+    name: archiveo_postgres_data
+  archiveo_uploads:
+    name: archiveo_uploads
+
+networks:
+  archiveo_network:
+    name: archiveo_network
+    driver: bridge

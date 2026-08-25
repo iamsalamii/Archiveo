@@ -239,7 +239,7 @@ public class SignatureService
         if (!string.IsNullOrWhiteSpace(s.SignerPhone))
         {
             var cleanPhone = new string(s.SignerPhone.Where(char.IsDigit).ToArray());
-            var message = Uri.EscapeDataString($"Bonjour {s.SignerName}, vous avez un document à signer sur la plateforme Archivéo : « {s.DocumentTitle} ».\nConnectez-vous pour signer : http://localhost:3000/signatures");
+            var message = Uri.EscapeDataString($"Bonjour {s.SignerName},\n\nVous avez un document en attente de visa et signature sur Archivéo :\n📄 *{s.DocumentTitle}* (Réf: {s.DocumentReference})\n\n👉 Cliquez sur le lien direct pour signer :\nhttp://localhost:3000/signatures\n\n_Archivéo Parapheur Électronique Sécurisé_");
             whatsAppUrl = $"https://wa.me/{cleanPhone}?text={message}";
         }
 

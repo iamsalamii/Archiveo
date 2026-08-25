@@ -152,9 +152,15 @@ export function SignatureRequestDialog({
       const result = await requestSignature(payload);
       
       const channelLabel = channel === 'both' ? 'WhatsApp & Email' : channel === 'whatsapp' ? 'WhatsApp' : 'Email';
-      toast.success(`Demande transmise avec succès ! Invitation envoyée immédiatement à ${signerName} via ${channelLabel}.`);
+      toast.success(`Demande transmise avec succès ! Invitation prête pour ${signerName} via ${channelLabel}.`);
       onCreated(result);
-      onOpenChange(false);
+
+      if (result.whatsAppDirectLink && (channel === 'whatsapp' || channel === 'both')) {
+        // Ouvrir directement la conversation WhatsApp
+        window.open(result.whatsAppDirectLink, '_blank');
+      }
+
+      setCreatedResult(result);
     } catch (err: unknown) {
       toast.error((err as Error).message || 'Erreur lors de la création de la demande.');
     } finally {
@@ -335,24 +341,29 @@ export function SignatureRequestDialog({
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <Label htmlFor="sphone" className="text-xs flex items-center gap-1">
-                    <Smartphone className="h-3 w-3 text-emerald-600" /> Numéro WhatsApp (Indicatif inclus)
+                <div className="space-y-1.5">
+                  <Label htmlFor="sphone" className="text-xs flex items-center gap-1 h-5">
+                    <Smartphone className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
+                    <span className="truncate">N° WhatsApp (avec indicatif)</span>
                   </Label>
                   <Input
                     id="sphone"
                     value={signerPhone}
                     onChange={(e) => setSignerPhone(e.target.value)}
-                    placeholder="+225 0708091011 ou +33 6..."
+                    placeholder="+225 0708091011 / +33..."
+                    className="text-xs"
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label htmlFor="srole" className="text-xs">Rôle / Fonction</Label>
+                <div className="space-y-1.5">
+                  <Label htmlFor="srole" className="text-xs flex items-center gap-1 h-5">
+                    <span className="truncate">Rôle / Fonction</span>
+                  </Label>
                   <Input
                     id="srole"
                     value={signerRole}
                     onChange={(e) => setSignerRole(e.target.value)}
-                    placeholder="Directeur Financier, Juriste..."
+                    placeholder="Ex: Directeur Financier..."
+                    className="text-xs"
                   />
                 </div>
               </div>
