@@ -20,6 +20,7 @@ public class ArchiveService
     public async Task<List<ArchiveDto>> GetAllAsync()
     {
         var archives = await _dbContext.ArchiveRecords
+            .AsNoTracking()
             .Where(a => a.IsActive)
             .OrderByDescending(a => a.ArchivedAt)
             .ToListAsync();
@@ -30,6 +31,7 @@ public class ArchiveService
     public async Task<ArchiveDto?> GetByIdAsync(Guid id)
     {
         var archive = await _dbContext.ArchiveRecords
+            .AsNoTracking()
             .FirstOrDefaultAsync(a => a.Id == id && a.IsActive);
 
         return archive == null ? null : MapToDto(archive);

@@ -19,6 +19,7 @@ public class AuditService
     public async Task<List<AuditLogDto>> GetAllAsync(int limit = 200)
     {
         var logs = await _dbContext.AuditLogs
+            .AsNoTracking()
             .OrderByDescending(a => a.Timestamp)
             .Take(limit)
             .ToListAsync();

@@ -21,6 +21,7 @@ public class CorrespondenceService
     public async Task<List<CorrespondenceDto>> GetAllAsync(string? type = null)
     {
         var query = _dbContext.Correspondences
+            .AsNoTracking()
             .Include(c => c.Document)
             .Where(c => c.IsActive);
 
@@ -39,6 +40,7 @@ public class CorrespondenceService
     public async Task<CorrespondenceDto?> GetByIdAsync(Guid id)
     {
         var correspondence = await _dbContext.Correspondences
+            .AsNoTracking()
             .Include(c => c.Document)
             .FirstOrDefaultAsync(c => c.Id == id && c.IsActive);
 

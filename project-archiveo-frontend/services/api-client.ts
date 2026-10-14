@@ -19,24 +19,64 @@ export const tokenService = {
   },
 };
 
-const pendingGets = new Map<string, Promise<unknown>>();
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+}
 
-// Wrapper fetch avec gestion du token et des erreurs
+const memoryCache = new Map<string, CacheEntry<unknown>>();
+const pendingGets = new Map<string, Promise<unknown>>();
+const DEFAULT_CACHE_TTL_MS = 25_000; // 25 secondes de rétention en mémoire pour navigation instantanée
+
+/**
+ * Invalide le cache en mémoire (totalement ou par motif d'URL)
+ */
+export function invalidateApiCache(pattern?: string) {
+  if (!pattern) {
+    memoryCache.clear();
+    return;
+  }
+  for (const key of memoryCache.keys()) {
+    if (key.includes(pattern)) {
+      memoryCache.delete(key);
+    }
+  }
+}
+
+// Wrapper fetch avec gestion du token, déduplication et cache mémoire instantané
 async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
   const isGet = (options.method ?? 'GET').toUpperCase() === 'GET';
+
   if (isGet) {
+    // 1. Vérifier si une réponse récente et valide existe en cache mémoire
+    const cached = memoryCache.get(endpoint);
+    if (cached && Date.now() - cached.timestamp < DEFAULT_CACHE_TTL_MS) {
+      return cached.data as T;
+    }
+
+    // 2. Dédupliquer les requêtes concurrentes en vol
     const pending = pendingGets.get(endpoint);
     if (pending) return pending as Promise<T>;
   }
 
   const request = apiFetchInternal<T>(endpoint, options);
+
   if (isGet) {
     pendingGets.set(endpoint, request);
-    request.finally(() => pendingGets.delete(endpoint)).catch(() => undefined);
+    request
+      .then((data) => {
+        memoryCache.set(endpoint, { data, timestamp: Date.now() });
+      })
+      .finally(() => pendingGets.delete(endpoint))
+      .catch(() => undefined);
+  } else {
+    // Toute opération mutante (POST, PUT, DELETE) invalide le cache correspondant pour garantir la fraîcheur
+    invalidateApiCache();
   }
+
   return request;
 }
 
@@ -59,19 +99,20 @@ async function apiFetchInternal<T>(
 
   // Gérer les erreurs
   if (!response.ok) {
-      if (response.status === 401) {
+    if (response.status === 401) {
       tokenService.remove();
-      
+      invalidateApiCache();
+
       const isPublicPage =
         typeof window !== 'undefined' &&
         (window.location.pathname === '/' ||
           window.location.pathname === '/login' ||
           window.location.pathname === '');
-      
+
       if (!isPublicPage && typeof window !== 'undefined') {
         window.location.href = '/login';
       }
-      
+
       throw new Error('Session expirée. Veuillez vous reconnecter.');
     }
 
@@ -106,4 +147,6 @@ export const apiClient = {
 
   delete: <T>(endpoint: string) =>
     apiFetch<T>(endpoint, { method: 'DELETE' }),
+
+  invalidateCache: invalidateApiCache,
 };

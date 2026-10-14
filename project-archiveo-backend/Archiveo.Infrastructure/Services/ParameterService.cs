@@ -21,6 +21,7 @@ public class ParameterService
     public async Task<List<ParameterGroupDto>> GetAllGroupsAsync()
     {
         var groups = await _dbContext.ParameterGroups
+            .AsNoTracking()
             .Include(g => g.Items.Where(i => i.IsActive))
             .Where(g => g.IsActive)
             .OrderBy(g => g.Order)
@@ -56,6 +57,7 @@ public class ParameterService
     public async Task<List<ParameterItemDto>> GetItemsByGroupAsync(string groupCode)
     {
         var items = await _dbContext.ParameterItems
+            .AsNoTracking()
             .Where(i => i.GroupCode == groupCode && i.IsActive)
             .OrderBy(i => i.Order)
             .ToListAsync();

@@ -21,6 +21,7 @@ public class WorkflowService
     public async Task<List<WorkflowDto>> GetAllAsync()
     {
         var workflows = await _dbContext.Workflows
+            .AsNoTracking()
             .Include(w => w.Document)
             .Include(w => w.Steps.OrderBy(s => s.Order))
             .Where(w => w.IsActive)
@@ -33,6 +34,7 @@ public class WorkflowService
     public async Task<WorkflowDto?> GetByIdAsync(Guid id)
     {
         var workflow = await _dbContext.Workflows
+            .AsNoTracking()
             .Include(w => w.Document)
             .Include(w => w.Steps.OrderBy(s => s.Order))
             .FirstOrDefaultAsync(w => w.Id == id && w.IsActive);
@@ -43,6 +45,7 @@ public class WorkflowService
     public async Task<WorkflowDto?> GetByDocumentIdAsync(Guid documentId)
     {
         var workflow = await _dbContext.Workflows
+            .AsNoTracking()
             .Include(w => w.Document)
             .Include(w => w.Steps.OrderBy(s => s.Order))
             .FirstOrDefaultAsync(w => w.DocumentId == documentId && w.IsActive);

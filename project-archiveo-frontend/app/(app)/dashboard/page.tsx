@@ -28,21 +28,28 @@ import {
   Clock,
   RotateCcw,
 } from 'lucide-react';
-import {
-  AreaChart,
-  Area,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
+import dynamic from 'next/dynamic';
+
+const EvolutionAndTypeCharts = dynamic(
+  () => import('@/components/dashboard/dashboard-charts').then((m) => m.EvolutionAndTypeCharts),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="grid gap-4 lg:grid-cols-2">
+        <Skeleton className="h-[340px] w-full rounded-xl" />
+        <Skeleton className="h-[340px] w-full rounded-xl" />
+      </div>
+    ),
+  }
+);
+
+const ServiceBarChart = dynamic(
+  () => import('@/components/dashboard/dashboard-charts').then((m) => m.ServiceBarChart),
+  {
+    ssr: false,
+    loading: () => <Skeleton className="h-[340px] w-full rounded-xl" />,
+  }
+);
 
 const chartColors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#06b6d4', '#ef4444', '#84cc16'];
 
@@ -301,82 +308,19 @@ export default function DashboardPage() {
       </div>
 
       {/* Charts row 1 */}
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <TrendingUp className="h-4 w-4 text-primary" />
-              {t('dashboard.monthlyEvolution')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <AreaChart data={monthlyData}>
-                <defs>
-                  <linearGradient id="colorDocs" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#3b82f6" stopOpacity={0} />
-                  </linearGradient>
-                  <linearGradient id="colorArc" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" />
-                <XAxis dataKey="month" className="text-xs" />
-                <YAxis className="text-xs" />
-                <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }} />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Area type="monotone" dataKey="documents" name="Documents" stroke="#3b82f6" fillOpacity={1} fill="url(#colorDocs)" strokeWidth={2} />
-                <Area type="monotone" dataKey="archives" name="Archives" stroke="#8b5cf6" fillOpacity={1} fill="url(#colorArc)" strokeWidth={2} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <FileText className="h-4 w-4 text-primary" />
-              {t('dashboard.byType')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={280}>
-              <PieChart>
-                <Pie data={byTypeData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90} innerRadius={50} label={(e: { name: string }) => e.name}>
-                  {byTypeData.map((entry, i) => (
-                    <Cell key={i} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }} />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
+      <EvolutionAndTypeCharts
+        monthlyData={monthlyData}
+        byTypeData={byTypeData}
+        titleEvolution={t('dashboard.monthlyEvolution')}
+        titleByType={t('dashboard.byType')}
+      />
 
       {/* Charts row 2 */}
       <div className="grid gap-4 lg:grid-cols-3">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Archive className="h-4 w-4 text-primary" />
-              {t('dashboard.byService')}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(280, byServiceData.length * 36)}>
-              <BarChart data={byServiceData} layout="vertical">
-                <CartesianGrid strokeDasharray="3 3" className="stroke-muted" horizontal={false} />
-                <XAxis type="number" className="text-xs" />
-                <YAxis type="category" dataKey="name" className="text-xs" width={140} tick={{ fontSize: 12 }} />
-                <Tooltip contentStyle={{ borderRadius: 8, border: '1px solid hsl(var(--border))', fontSize: 12 }} />
-                <Bar dataKey="documents" fill="#3b82f6" radius={[0, 4, 4, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
+        <ServiceBarChart
+          byServiceData={byServiceData}
+          titleByService={t('dashboard.byService')}
+        />
 
         <Card>
           <CardHeader>

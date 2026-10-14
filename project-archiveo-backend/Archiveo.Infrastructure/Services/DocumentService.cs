@@ -36,6 +36,7 @@ public class DocumentService
     public async Task<List<DocumentDto>> GetAllAsync()
     {
         var docs = await _dbContext.Documents
+            .AsNoTracking()
             .Where(d => d.IsActive)
             .OrderByDescending(d => d.CreatedAt)
             .ToListAsync();
@@ -47,6 +48,7 @@ public class DocumentService
     public async Task<DocumentDto?> GetByIdAsync(Guid id)
     {
         var doc = await _dbContext.Documents
+            .AsNoTracking()
             .FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
 
         return doc == null ? null : MapToDto(doc);

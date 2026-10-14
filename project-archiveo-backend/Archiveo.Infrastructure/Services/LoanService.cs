@@ -20,6 +20,7 @@ public class LoanService
     public async Task<List<LoanDto>> GetAllLoansAsync()
     {
         var loans = await _dbContext.LoanRecords
+            .AsNoTracking()
             .Include(l => l.Document)
             .Where(l => l.IsActive)
             .OrderByDescending(l => l.BorrowDate)
@@ -31,6 +32,7 @@ public class LoanService
     public async Task<LoanDto?> GetLoanByIdAsync(Guid id)
     {
         var loan = await _dbContext.LoanRecords
+            .AsNoTracking()
             .Include(l => l.Document)
             .FirstOrDefaultAsync(l => l.Id == id && l.IsActive);
         return loan == null ? null : MapLoanToDto(loan);
