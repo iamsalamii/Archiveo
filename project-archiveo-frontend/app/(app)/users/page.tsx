@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
     fetchUsers,
     fetchRoles,
@@ -57,6 +58,7 @@ import {
 import { toast } from 'sonner';
 
 export default function UsersPage() {
+    const { t } = useI18n();
     const { getItemName, getItems } = useParameters();
     const [users, setUsers] = useState<UserApi[]>([]);
     const [roles, setRoles] = useState<RoleApi[]>([]);
@@ -326,20 +328,20 @@ export default function UsersPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Utilisateurs"
-                subtitle="Gestion des comptes, des attributions de rôles et de la sécurité des accès"
+                title={t('users.title', 'Utilisateurs & Profils')}
+                subtitle={t('users.subtitle', 'Gestion des comptes, des attributions de rôles et de la sécurité des accès')}
                 icon={<Users className="h-6 w-6" />}
                 exportData={exportData}
                 exportFilename="registre-utilisateurs-archiveo"
-                exportTitle="Annuaire et Registre des Utilisateurs"
+                exportTitle={t('users.title', 'Annuaire et Registre des Utilisateurs')}
                 exportColumns={[
-                    { key: 'Nom & Prénom', label: 'Nom & Prénom' },
+                    { key: 'Nom & Prénom', label: t('common.name', 'Nom & Prénom') },
                     { key: 'Identifiant', label: 'Identifiant' },
-                    { key: 'Courriel', label: 'Courriel' },
-                    { key: 'Matricule', label: 'Matricule' },
-                    { key: 'Fonction', label: 'Fonction' },
-                    { key: 'Service', label: 'Service' },
-                    { key: 'Rôles', label: 'Rôles & Permissions' },
+                    { key: 'Courriel', label: t('common.email', 'Courriel') },
+                    { key: 'Matricule', label: t('users.matricule', 'Matricule') },
+                    { key: 'Fonction', label: t('users.function', 'Fonction') },
+                    { key: 'Service', label: t('common.service', 'Service') },
+                    { key: 'Rôles', label: t('common.role', 'Rôles & Permissions') },
                 ]}
                 exportMetadata={{
                     subtitle: 'Liste des comptes habilités et affectations',
@@ -347,7 +349,7 @@ export default function UsersPage() {
                 }}
                 actions={
                     <Button onClick={openCreateDialog} className="gap-2">
-                        <Plus className="h-4 w-4" /> Nouvel utilisateur
+                        <Plus className="h-4 w-4" /> {t('users.newUser', 'Nouvel utilisateur')}
                     </Button>
                 }
             />

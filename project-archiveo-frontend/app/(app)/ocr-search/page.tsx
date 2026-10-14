@@ -29,6 +29,7 @@ import {
   PlusCircle,
 } from 'lucide-react';
 import { DocumentViewerDialog, type DocumentViewerItem } from '@/components/documents/document-viewer-dialog';
+import { useI18n } from '@/contexts/i18n-context';
 import { toast } from 'sonner';
 
 export interface OcrIndexedDocument {
@@ -47,8 +48,77 @@ export interface OcrIndexedDocument {
 
 const STORAGE_KEY = 'archiveo_ocr_documents';
 
+const DEFAULT_OCR_DOCS: OcrIndexedDocument[] = [
+  {
+    id: 'ocr-001',
+    reference: 'DOC-2025-001',
+    title: "Convention d'Audit Financier et Commissariat aux Comptes 2025-2027",
+    category: 'Juridique',
+    service: 'Direction Juridique',
+    date: '15 Janvier 2025',
+    accuracy: 99.4,
+    fileName: 'convention_audit_deloitte_2025_2027.pdf',
+    fileSize: '2.45 Mo',
+    extractedText:
+      "ARTICLE 1 - OBJET DE LA CONVENTION. La présente convention a pour objet de définir les conditions dans lesquelles le cabinet Deloitte & Associés assurera la mission de commissariat aux comptes et de certification des comptes annuels de la société Archivéo pour les exercices 2025, 2026 et 2027 conformément aux normes d'audit international ISA et aux dispositions du Code de commerce. ARTICLE 4 - HONORAIRES ET RÈGLEMENT. Le budget global annuel des honoraires de certification s'établit à un montant forfaitaire de 45 000 EUR HT.",
+  },
+  {
+    id: 'ocr-002',
+    reference: 'DOC-2025-002',
+    title: "Politique de Sécurité des Systèmes d'Information (PSSI v3.2)",
+    category: 'Technique',
+    service: "Systèmes d'Information",
+    date: '10 Janvier 2025',
+    accuracy: 98.8,
+    fileName: 'pssi_archiveo_v3_2_signed.pdf',
+    fileSize: '1.85 Mo',
+    extractedText:
+      "SECTION 3 - CONTRÔLE DES ACCÈS ET GESTION DES IDENTITÉS. Tout accès aux référentiels d'archives numériques et aux coffres-forts électroniques requiert une authentification forte à double facteur (2FA / FIDO2). Les privilèges d'administration système sont accordés selon le principe du moindre privilège (PoLP) et font l'objet d'une révision trimestrielle. Chiffrement obligatoire au repos via l'algorithme AES-256 et en transit par TLS 1.3.",
+  },
+  {
+    id: 'ocr-003',
+    reference: 'DOC-2025-008',
+    title: "Accord d'Entreprise Télétravail & Flexibilité Hybride 2025-2028",
+    category: 'Ressources Humaines',
+    service: 'Ressources Humaines',
+    date: '12 Janvier 2025',
+    accuracy: 99.1,
+    fileName: 'accord_teletravail_signe_2025.pdf',
+    fileSize: '780 Ko',
+    extractedText:
+      "ARTICLE 3 - RYTHME ET MODALITÉS DU TÉLÉTRAVAIL. Les salariés bénéficiant d'une autonomie suffisante dans l'exercice de leurs fonctions peuvent exercer jusqu'à 3 jours de travail à distance par semaine. Un équipement informatique portable sécurisé ainsi qu'une indemnité forfaitaire mensuelle de prise en charge des frais professionnels sont alloués par la direction.",
+  },
+  {
+    id: 'ocr-004',
+    reference: 'DOC-2025-004',
+    title: "Contrat Cadre Hébergement Cloud Souverain & HDS (OVHcloud Enterprise)",
+    category: 'Juridique',
+    service: "Systèmes d'Information",
+    date: '20 Janvier 2025',
+    accuracy: 97.9,
+    fileName: 'contrat_cadre_ovhcloud_hds_draft_v2.pdf',
+    fileSize: '3.12 Mo',
+    extractedText:
+      "ANNEXE DE SÉCURITÉ ET HÉBERGEMENT DE DONNÉES DE SANTÉ (HDS). Le prestataire garantit la localisation exclusive des datacenters en France métropolitaine et la qualification SecNumCloud délivrée par l'ANSSI. Les engagements de disponibilité de service (SLA) sont contractuellement fixés à 99,99% mensuel avec garantie de temps de rétablissement (GTR) inférieure à 2 heures.",
+  },
+  {
+    id: 'ocr-005',
+    reference: 'DOC-2025-010',
+    title: 'Bail Commercial Siège Social - Tour Horizon 2024-2033',
+    category: 'Juridique',
+    service: 'Direction Juridique',
+    date: '02 Décembre 2024',
+    accuracy: 99.7,
+    fileName: 'bail_commercial_tour_horizon_signe.pdf',
+    fileSize: '5.21 Mo',
+    extractedText:
+      "BAIL COMMERCIAL STATUTAIRE SOUMIS AUX ARTICLES L. 145-1 ET SUIVANTS DU CODE DE COMMERCE. Entre la Société Foncière Horizon (Bailleur) et la Société Archivéo SAS (Preneur). Désignation des locaux : 2500 mètres carrés comprenant les plateaux des 12e et 13e étages ainsi que 300 mètres carrés de sous-sol technique aménagé pour magasins d'archivage physique haute densité.",
+  },
+];
+
 export default function OcrSearchPage() {
-  const [ocrDocs, setOcrDocs] = useState<OcrIndexedDocument[]>([]);
+  const { t } = useI18n();
+  const [ocrDocs, setOcrDocs] = useState<OcrIndexedDocument[]>(DEFAULT_OCR_DOCS);
   const [query, setQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [selectedDocForViewer, setSelectedDocForViewer] = useState<DocumentViewerItem | null>(null);
@@ -61,15 +131,22 @@ export default function OcrSearchPage() {
   const [simulatedExtractedText, setSimulatedExtractedText] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Charger les documents indexés
+  // Charger les documents indexés avec fallback
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setOcrDocs(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setOcrDocs(parsed);
+        } else {
+          setOcrDocs(DEFAULT_OCR_DOCS);
+        }
+      } else {
+        setOcrDocs(DEFAULT_OCR_DOCS);
       }
     } catch {
-      // ignore
+      setOcrDocs(DEFAULT_OCR_DOCS);
     }
   }, []);
 
@@ -240,12 +317,12 @@ Tous les mots-clés de ce document peuvent désormais être recherchés en plein
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Moteur OCR & Recherche Plein Texte"
-        subtitle="Recherche instantanée dans le texte intégral de tous les documents scannés et numérisés"
+        title={t('ocr.title', 'Recherche OCR & Moteur Plein Texte')}
+        subtitle={t('ocr.subtitle', 'Recherche instantanée dans le texte intégral de tous les documents scannés et numérisés')}
         icon={<FileSearch className="h-6 w-6" />}
         exportData={exportTableData}
         exportFilename="recherche-ocr-resultats"
-        exportTitle="Résultats de Recherche Plein Texte & OCR"
+        exportTitle={t('ocr.title', 'Résultats de Recherche Plein Texte & OCR')}
         exportMetadata={{
           subtitle: `Requête : « ${query || 'Tous les documents'} » • ${searchResults.length} document(s) trouvé(s)`,
           category: 'Reconnaissance Optique de Caractères et Indexation',
@@ -309,11 +386,11 @@ Tous les mots-clés de ce document peuvent désormais être recherchés en plein
         <TabsList className="bg-muted/70 p-1">
           <TabsTrigger value="search" className="gap-2 text-xs font-semibold">
             <Search className="h-3.5 w-3.5" />
-            Recherche Plein Texte ({searchResults.length})
+            {t('ocr.fullTextSearch', 'Recherche Plein Texte')} ({searchResults.length})
           </TabsTrigger>
           <TabsTrigger value="scanner" className="gap-2 text-xs font-semibold">
             <ScanText className="h-3.5 w-3.5" />
-            Numériseur & Extracteur OCR
+            {t('ocr.scanNew', 'Numériseur & Extracteur OCR')}
           </TabsTrigger>
         </TabsList>
 
@@ -327,7 +404,7 @@ Tous les mots-clés de ce document peuvent désormais être recherchés en plein
                   <Input
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    placeholder="Rechercher n'importe quel mot ou phrase dans le contenu des documents..."
+                    placeholder={t('ocr.searchPlaceholder', "Rechercher n'importe quel mot ou phrase dans le contenu des documents...")}
                     className="pl-10 h-11 text-sm font-medium"
                   />
                   {query && (
@@ -335,16 +412,16 @@ Tous les mots-clés de ce document peuvent désormais être recherchés en plein
                       onClick={() => setQuery('')}
                       className="absolute right-3 top-3 text-xs text-muted-foreground hover:text-foreground bg-muted px-1.5 py-0.5 rounded"
                     >
-                      Effacer
+                      {t('common.clear', 'Effacer')}
                     </button>
                   )}
                 </div>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="w-full sm:w-56 h-11">
-                    <SelectValue placeholder="Toutes catégories" />
+                    <SelectValue placeholder={t('common.allCategories', 'Toutes catégories')} />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">Toutes catégories</SelectItem>
+                    <SelectItem value="all">{t('common.allCategories', 'Toutes catégories')}</SelectItem>
                     {categories.map((c) => (
                       <SelectItem key={c} value={c}>
                         {c}

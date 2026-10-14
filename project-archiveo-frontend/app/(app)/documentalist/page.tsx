@@ -11,12 +11,14 @@ import { ParameterSelect } from '@/components/shared/parameter-select';
 import { DataTable, type Column } from '@/components/shared/data-table';
 import { ColorBadge } from '@/components/shared/color-badge';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import { api } from '@/services/api';
 import type { GedDocument } from '@/types';
 import { Library, BookOpen, BrainCircuit, Sparkles, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function DocumentalistPage() {
+  const { t } = useI18n();
   const { getItemName, getItem } = useParameters();
   const [docs, setDocs] = useState<GedDocument[]>([]);
   const [selected, setSelected] = useState<GedDocument | null>(null);
@@ -107,12 +109,12 @@ export default function DocumentalistPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Documentaliste"
-        subtitle="Gestion documentaire, indexation, catalogage et enrichissement sémantique"
+        title={t('documentalist.title', 'Espace Documentaliste & Thésaurus')}
+        subtitle={t('documentalist.subtitle', 'Gestion documentaire, indexation, catalogage et enrichissement sémantique')}
         icon={<Library className="h-6 w-6" />}
         exportData={exportData}
         exportFilename="catalogue-documentaire"
-        exportTitle="Catalogue Documentaire & Indexation"
+        exportTitle={t('documentalist.title', 'Catalogue Documentaire & Indexation')}
         exportColumns={[
           { key: 'Cote', label: 'Cote' },
           { key: 'Titre', label: 'Titre' },

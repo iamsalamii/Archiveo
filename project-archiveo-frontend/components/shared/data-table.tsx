@@ -26,6 +26,7 @@ import {
   Square,
 } from 'lucide-react';
 import { printDataReport } from '@/utils/export';
+import { useI18n } from '@/contexts/i18n-context';
 import { cn } from '@/lib/utils';
 import type { SortDirection } from '@/types';
 import { toast } from 'sonner';
@@ -67,17 +68,20 @@ export function DataTable<T>({
   exportFilename = 'export',
   exportTitle = 'Export',
   toolbar,
-  emptyMessage = 'Aucune donnée',
+  emptyMessage,
   onRowClick,
   cardRender,
   selectable = true,
 }: DataTableProps<T>) {
+  const { t } = useI18n();
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<keyof T | null>(null);
   const [sortDir, setSortDir] = useState<SortDirection>('asc');
   const [page, setPage] = useState(0);
   const [view, setView] = useState<'table' | 'list' | 'card'>('table');
   const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set());
+
+  const effectiveEmptyMessage = emptyMessage || t('common.noData', 'Aucune donnée');
 
   const filtered = useMemo(() => {
     if (!search) return data;
@@ -102,15 +106,42 @@ export function DataTable<T>({
   }, [filtered, sortKey, sortDir]);
 
   const totalPages = Math.ceil(sorted.length / pageSize);
-  const pageData = sorted.slice(page * pageSize, page * pageSize + pageSize);
+  const pageData = useMemo(() => {
+    const start = page * pageSize;
+    return sorted.slice(start, start + pageSize);
+  }, [sorted, page, pageSize]);
 
   const toggleSort = (key: keyof T) => {
     if (sortKey === key) {
-      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+      if (sortDir === 'asc') setSortDir('desc');
+      else {
+        setSortKey(null);
+        setSortDir('asc');
+      }
     } else {
       setSortKey(key);
       setSortDir('asc');
     }
+  };
+
+  const exportData = useMemo(() => {
+    return sorted.map((row) => {
+      const itemOut: Record<string, unknown> = {};
+      columns.forEach((c) => {
+        itemOut[c.label] = c.exportValue ? c.exportValue(row) : String((row as Record<string, unknown>)[c.key as string] ?? '—');
+      });
+      return itemOut;
+    });
+  }, [sorted, columns]);
+
+  const toggleSelectRow = (idx: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setSelectedIndices((prev) => {
+      const next = new Set(prev);
+      if (next.has(idx)) next.delete(idx);
+      else next.add(idx);
+      return next;
+    });
   };
 
   const toggleSelectAll = () => {
@@ -121,41 +152,12 @@ export function DataTable<T>({
     }
   };
 
-  const toggleSelectRow = (idx: number, e?: React.MouseEvent) => {
-    if (e) e.stopPropagation();
-    setSelectedIndices((prev) => {
-      const next = new Set(prev);
-      if (next.has(idx)) {
-        next.delete(idx);
-      } else {
-        next.add(idx);
-      }
-      return next;
-    });
-  };
-
-  const exportColumns = columns
-    .filter((c) => c.exportValue || c.key)
-    .map((c) => ({
-      key: c.key,
-      label: c.label,
-    }));
-
-  const exportData = sorted.map((row) => {
-    const out: Record<string, unknown> = {};
-    columns.forEach((c) => {
-      out[c.label] = c.exportValue ? c.exportValue(row) : String((row as Record<string, unknown>)[c.key as string] ?? '');
-    });
-    return out;
-  });
-
   const handlePrintSelected = () => {
-    const selectedRows = sorted.filter((_, i) => selectedIndices.has(i));
-    if (selectedRows.length === 0) {
+    if (selectedIndices.size === 0) {
       toast.error('Veuillez sélectionner au moins un élément à imprimer.');
       return;
     }
-
+    const selectedRows = Array.from(selectedIndices).map((i) => sorted[i]);
     const printFormatted = selectedRows.map((row) => {
       const itemOut: Record<string, unknown> = {};
       columns.forEach((c) => {
@@ -184,7 +186,7 @@ export function DataTable<T>({
             <div className="relative w-full sm:w-72">
               <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Recherche instantanée..."
+                placeholder={t('common.searchPlaceholder', 'Recherche instantanée...')}
                 value={search}
                 onChange={(e) => {
                   setSearch(e.target.value);
@@ -233,7 +235,7 @@ export function DataTable<T>({
               className="gap-1.5 text-xs text-primary border-primary/40 bg-primary/5 hover:bg-primary/10 shadow-xs"
             >
               <Printer className="h-3.5 w-3.5" />
-              <span>Imprimer {selectedIndices.size === 1 ? 'la fiche' : `sélection (${selectedIndices.size})`}</span>
+              <span>{t('common.print', 'Imprimer')} ({selectedIndices.size})</span>
             </Button>
           )}
           {toolbar}
@@ -306,7 +308,7 @@ export function DataTable<T>({
               {pageData.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={columns.length + (selectable ? 1 : 0)} className="h-24 text-center text-muted-foreground text-xs">
-                    {emptyMessage}
+                    {effectiveEmptyMessage}
                   </TableCell>
                 </TableRow>
               ) : (
@@ -364,7 +366,7 @@ export function DataTable<T>({
               onClick={() => setPage((p) => p - 1)}
               className="text-xs h-7"
             >
-              Précédent
+              {t('common.previous', 'Précédent')}
             </Button>
             <Button
               variant="outline"
@@ -373,7 +375,7 @@ export function DataTable<T>({
               onClick={() => setPage((p) => p + 1)}
               className="text-xs h-7"
             >
-              Suivant
+              {t('common.next', 'Suivant')}
             </Button>
           </div>
         </div>

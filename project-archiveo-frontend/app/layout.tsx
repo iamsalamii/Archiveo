@@ -6,8 +6,13 @@ import { Providers } from '@/components/providers';
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Archivéo — Gestion Electronique de Documents',
-  description: 'GED, Archivage, Documentation et Records Management',
+  title: 'Archivéo — Gestion Electronique de Documents & Archives',
+  description: 'GED, Archivage physique et numérique, Topographie, Parapheur électronique et Records Management',
+  icons: {
+    icon: '/favicon.svg',
+    shortcut: '/favicon.svg',
+    apple: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({

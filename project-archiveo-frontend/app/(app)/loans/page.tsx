@@ -25,6 +25,7 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { CheckCircle2, RefreshCw, Undo2, Trash2, BookOpen, Clock, Calendar, HandHelping, Plus, Eye } from 'lucide-react';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
     fetchLoans,
     fetchConsultations,
@@ -57,17 +58,8 @@ function loanStatusVariant(status: string) {
     }
 }
 
-function loanStatusLabel(status: string) {
-    switch (status) {
-        case 'active': return 'Actif';
-        case 'overdue': return 'En retard';
-        case 'returned': return 'Retourné';
-        case 'renewed': return 'Prolongé';
-        default: return status;
-    }
-}
-
 export default function LoansPage() {
+    const { t } = useI18n();
     const { getItemName } = useParameters();
     const [loans, setLoans] = useState<LoanApi[]>([]);
     const [consultations, setConsultations] = useState<ConsultationApi[]>([]);
@@ -75,6 +67,16 @@ export default function LoansPage() {
     const [activeTab, setActiveTab] = useState<'loans' | 'consultations'>('loans');
     const [loanFormOpen, setLoanFormOpen] = useState(false);
     const [consultFormOpen, setConsultFormOpen] = useState(false);
+
+    const loanStatusLabel = useCallback((status: string) => {
+        switch (status) {
+            case 'active': return t('loans.active', 'Actif');
+            case 'overdue': return t('loans.overdue', 'En retard');
+            case 'returned': return t('loans.returned', 'Retourné');
+            case 'renewed': return t('common.active', 'Prolongé');
+            default: return status;
+        }
+    }, [t]);
 
     const load = useCallback(async (silent = false) => {
         if (!silent) setLoading(true);
@@ -202,12 +204,12 @@ export default function LoansPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Prêts & Consultations"
-                subtitle="Gestion et traçabilité des communications, emprunts et consultations de documents"
+                title={t('loans.title', 'Prêts & Consultations')}
+                subtitle={t('loans.subtitle', 'Gestion et traçabilité des communications, emprunts et consultations de documents')}
                 icon={<HandHelping className="h-6 w-6" />}
                 exportData={exportData}
                 exportFilename={activeTab === 'loans' ? 'registre-prets' : 'registre-consultations'}
-                exportTitle={activeTab === 'loans' ? 'Registre des Prêts de Documents' : 'Registre des Consultations sur Place'}
+                exportTitle={activeTab === 'loans' ? t('loans.title', 'Registre des Prêts de Documents') : t('loans.readingRoom', 'Registre des Consultations sur Place')}
                 exportColumns={
                     (activeTab === 'loans'
                         ? [

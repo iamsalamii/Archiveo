@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
     fetchArchives,
     deleteArchive,
@@ -51,23 +52,24 @@ function statusVariant(status: string) {
     }
 }
 
-function statusLabel(status: string) {
-    switch (status) {
-        case 'CURRENT': return 'Courante';
-        case 'INTERMEDIATE': return 'Intermédiaire';
-        case 'FINAL': return 'Définitive';
-        case 'DESTROYED': return 'Détruite';
-        default: return status;
-    }
-}
-
 export default function ArchivesPage() {
+    const { t } = useI18n();
     const { getItemName, getItems } = useParameters();
     const [archives, setArchives] = useState<ArchiveApi[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState('all');
     const [typeFilter, setTypeFilter] = useState('all');
+
+    const statusLabel = useCallback((status: string) => {
+        switch (status) {
+            case 'CURRENT': return t('archives.current', 'Courante');
+            case 'INTERMEDIATE': return t('archives.intermediate', 'Intermédiaire');
+            case 'FINAL': return t('archives.definitive', 'Définitive');
+            case 'DESTROYED': return t('archives.destroyed', 'Détruite');
+            default: return status;
+        }
+    }, [t]);
     const [formOpen, setFormOpen] = useState(false);
     const [transitionOpen, setTransitionOpen] = useState(false);
     const [editing, setEditing] = useState<ArchiveApi | null>(null);
@@ -131,20 +133,20 @@ export default function ArchivesPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Archives"
-                subtitle="Gestion du cycle de vie des archives (Courantes, Intermédiaires, Définitives, Destruction)"
+                title={t('archives.title', 'Archives & Versements')}
+                subtitle={t('archives.subtitle', 'Gestion du cycle de vie des archives (Courantes, Intermédiaires, Définitives, Destruction)')}
                 icon={<Archive className="h-6 w-6" />}
                 exportData={exportData}
                 exportFilename="registre-archives"
-                exportTitle="Registre Général des Archives"
+                exportTitle={t('archives.title', 'Registre Général des Archives')}
                 exportColumns={[
-                    { key: 'Référence', label: 'Référence' },
-                    { key: 'Titre', label: 'Titre de l’archive' },
-                    { key: 'Type', label: 'Type' },
-                    { key: 'Statut', label: 'Statut' },
-                    { key: 'Date archivage', label: 'Date archivage' },
-                    { key: 'Date rétention', label: 'Date fin de rétention' },
-                    { key: 'Emplacement', label: 'Emplacement' },
+                    { key: 'Référence', label: t('common.reference', 'Référence') },
+                    { key: 'Titre', label: t('common.title', 'Titre de l’archive') },
+                    { key: 'Type', label: t('common.type', 'Type') },
+                    { key: 'Statut', label: t('common.status', 'Statut') },
+                    { key: 'Date archivage', label: t('common.date', 'Date archivage') },
+                    { key: 'Date rétention', label: t('archives.retentionDate', 'Date fin de rétention') },
+                    { key: 'Emplacement', label: t('common.location', 'Emplacement') },
                 ]}
                 exportMetadata={{
                     subtitle: 'État d’inventaire et de conservation des archives',
@@ -152,7 +154,7 @@ export default function ArchivesPage() {
                 }}
                 actions={
                     <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-2">
-                        <Plus className="h-4 w-4" /> Nouvelle archive
+                        <Plus className="h-4 w-4" /> {t('archives.new', 'Nouvelle archive')}
                     </Button>
                 }
             />
@@ -165,18 +167,18 @@ export default function ArchivesPage() {
                         <Input
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
-                            placeholder="Rechercher..."
+                            placeholder={t('archives.searchPlaceholder', 'Rechercher...')}
                             className="pl-9"
                         />
                     </div>
                     <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
+                        <SelectTrigger><SelectValue placeholder={t('common.status', 'Statut')} /></SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Tous les statuts</SelectItem>
-                            <SelectItem value="CURRENT">Courante</SelectItem>
-                            <SelectItem value="INTERMEDIATE">Intermédiaire</SelectItem>
-                            <SelectItem value="FINAL">Définitive</SelectItem>
-                            <SelectItem value="DESTROYED">Détruite</SelectItem>
+                            <SelectItem value="all">{t('docs.filterStatus', 'Tous les statuts')}</SelectItem>
+                            <SelectItem value="CURRENT">{t('archives.current', 'Courante')}</SelectItem>
+                            <SelectItem value="INTERMEDIATE">{t('archives.intermediate', 'Intermédiaire')}</SelectItem>
+                            <SelectItem value="FINAL">{t('archives.definitive', 'Définitive')}</SelectItem>
+                            <SelectItem value="DESTROYED">{t('archives.destroyed', 'Détruite')}</SelectItem>
                         </SelectContent>
                     </Select>
                     <Select value={typeFilter} onValueChange={setTypeFilter}>

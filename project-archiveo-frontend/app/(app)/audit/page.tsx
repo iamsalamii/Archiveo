@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchAuditLogs, AuditLogApi } from '@/services/audit-api';
+import { useI18n } from '@/contexts/i18n-context';
 import {
   History,
   Search,
@@ -89,6 +90,7 @@ function formatBusinessAction(log: AuditLogApi): { module: string; description: 
 }
 
 export default function AuditPage() {
+  const { t } = useI18n();
   const [logs, setLogs] = useState<AuditLogApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -166,17 +168,17 @@ export default function AuditPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Journal d'audit & Traçabilité"
-        subtitle="Registre sécurisé des activités, modifications et accès métier au système"
+        title={t('audit.title', "Journal d'Audit Inviolable")}
+        subtitle={t('audit.subtitle', "Traçabilité complète et horodatage certifié de tous les événements système et documentaires")}
         icon={<History className="h-6 w-6" />}
         exportData={exportData}
         exportFilename="journal-audit-archiveo"
-        exportTitle="Journal Officiel d'Audit et de Traçabilité Métier"
+        exportTitle={t('audit.title', "Journal Officiel d'Audit et de Traçabilité")}
         exportColumns={[
-          { key: 'Date & Heure', label: 'Date & Heure' },
-          { key: 'Utilisateur', label: 'Utilisateur' },
+          { key: 'Date & Heure', label: t('audit.timestamp', 'Date & Heure') },
+          { key: 'Utilisateur', label: t('audit.user', 'Utilisateur') },
           { key: 'Module Concerné', label: 'Module' },
-          { key: 'Action Réalisée', label: 'Action Réalisée' },
+          { key: 'Action Réalisée', label: t('audit.action', 'Action Réalisée') },
           { key: 'Résultat', label: 'Résultat' },
         ]}
         exportMetadata={{
@@ -185,7 +187,7 @@ export default function AuditPage() {
         }}
         actions={
           <Button variant="outline" onClick={load} className="gap-2 shadow-sm">
-            <RefreshCw className="h-4 w-4" /> Actualiser
+            <RefreshCw className="h-4 w-4" /> {t('common.refresh', 'Actualiser')}
           </Button>
         }
       />

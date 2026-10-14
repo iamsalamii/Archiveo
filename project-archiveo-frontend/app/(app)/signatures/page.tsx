@@ -63,8 +63,10 @@ import {
 import { SignaturePadDialog } from '@/components/signatures/signature-pad-dialog';
 import { SignatureRequestDialog } from '@/components/signatures/signature-request-dialog';
 import { SignatureCertificateDialog } from '@/components/signatures/signature-certificate-dialog';
+import { useI18n } from '@/contexts/i18n-context';
 
 export default function SignaturesPage() {
+  const { t } = useI18n();
   const [activeTab, setActiveTab] = useState<'pending' | 'requested' | 'signed' | 'rejected'>('pending');
   const [signatures, setSignatures] = useState<DocumentSignatureApi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -230,22 +232,22 @@ export default function SignaturesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Parapheur Électronique & Signatures"
-        subtitle="Validation juridique, signatures multi-signataires et scellement cryptographique avec alertes WhatsApp & Email"
+        title={t('signatures.title', 'Parapheur Électronique & eIDAS')}
+        subtitle={t('signatures.subtitle', 'Validation juridique, signatures multi-signataires et scellement cryptographique avec alertes WhatsApp & Email')}
         icon={<PenTool className="h-6 w-6" />}
         exportData={exportData}
         exportFilename="registre-parapheur-signatures"
-        exportTitle="Registre Officiel du Parapheur Électronique"
+        exportTitle={t('signatures.title', 'Registre Officiel du Parapheur Électronique')}
         exportColumns={[
-          { key: 'Référence', label: 'Réf. Document' },
-          { key: 'Document', label: 'Titre Document' },
-          { key: 'Signataire', label: 'Signataire' },
-          { key: 'Email', label: 'Email' },
+          { key: 'Référence', label: t('common.reference', 'Réf. Document') },
+          { key: 'Document', label: t('common.title', 'Titre Document') },
+          { key: 'Signataire', label: t('signatures.signer', 'Signataire') },
+          { key: 'Email', label: t('common.email', 'Email') },
           { key: 'Téléphone_WhatsApp', label: 'WhatsApp / Mobile' },
-          { key: 'Statut', label: 'Statut' },
-          { key: 'Date_Demande', label: 'Date Demande' },
-          { key: 'Date_Signature', label: 'Date Signature' },
-          { key: 'Certificat_SHA256', label: 'N° Certificat / Empreinte' },
+          { key: 'Statut', label: t('common.status', 'Statut') },
+          { key: 'Date_Demande', label: t('common.date', 'Date Demande') },
+          { key: 'Date_Signature', label: t('common.date', 'Date Signature') },
+          { key: 'Certificat_SHA256', label: t('signatures.certificate', 'N° Certificat / Empreinte') },
         ]}
         exportMetadata={{
           subtitle: 'Journal de traçabilité des visas et signatures électroniques eIDAS',
@@ -253,7 +255,7 @@ export default function SignaturesPage() {
         }}
         actions={
           <Button onClick={() => setRequestDialogOpen(true)} className="gap-2 shadow-sm">
-            <Plus className="h-4 w-4" /> Transmettre pour Signature
+            <Plus className="h-4 w-4" /> {t('signatures.newRequest', 'Transmettre pour Signature')}
           </Button>
         }
       />

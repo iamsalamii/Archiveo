@@ -8,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DataTable, type Column } from '@/components/shared/data-table';
 import { ColorBadge } from '@/components/shared/color-badge';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
   fetchCorrespondences,
   deleteCorrespondence,
@@ -18,6 +19,7 @@ import { Mail, ArrowDownLeft, ArrowUpRight, RefreshCw, Plus, Pencil, Trash2 } fr
 import { toast } from 'sonner';
 
 export default function CorrespondencePage() {
+  const { t } = useI18n();
   const { getItemName, getItem } = useParameters();
   const [correspondences, setCorrespondences] = useState<CorrespondenceApi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -177,19 +179,19 @@ export default function CorrespondencePage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Courriers"
-        subtitle="Gestion, enregistrement et traçabilité des correspondances officielles"
+        title={t('correspondence.title', 'Courriers & Flux')}
+        subtitle={t('correspondence.subtitle', 'Gestion, enregistrement et traçabilité des correspondances officielles')}
         icon={<Mail className="h-6 w-6" />}
         exportData={exportData}
         exportFilename={`registre-courriers-${activeTab}`}
-        exportTitle={`Registre des Courriers (${activeTab.toUpperCase()})`}
+        exportTitle={`${t('correspondence.title', 'Registre des Courriers')} (${activeTab.toUpperCase()})`}
         exportColumns={[
-          { key: 'Référence', label: 'Référence' },
-          { key: 'Type', label: 'Type de courrier' },
-          { key: 'Objet', label: 'Objet du courrier' },
-          { key: 'Expéditeur', label: 'Expéditeur' },
-          { key: 'Destinataire', label: 'Destinataire' },
-          { key: 'Date', label: 'Date d’enregistrement' },
+          { key: 'Référence', label: t('common.reference', 'Référence') },
+          { key: 'Type', label: t('common.type', 'Type de courrier') },
+          { key: 'Objet', label: t('correspondence.subject', 'Objet du courrier') },
+          { key: 'Expéditeur', label: t('correspondence.sender', 'Expéditeur') },
+          { key: 'Destinataire', label: t('correspondence.recipient', 'Destinataire') },
+          { key: 'Date', label: t('common.date', 'Date d’enregistrement') },
           { key: 'Signature', label: 'Mode de signature' },
         ]}
         exportMetadata={{
@@ -204,7 +206,7 @@ export default function CorrespondencePage() {
             }}
             className="gap-2"
           >
-            <Plus className="h-4 w-4" /> Nouveau courrier
+            <Plus className="h-4 w-4" /> {t('correspondence.new', 'Nouveau courrier')}
           </Button>
         }
       />

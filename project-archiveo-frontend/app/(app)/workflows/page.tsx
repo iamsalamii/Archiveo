@@ -32,6 +32,7 @@ import {
 import { fetchDocuments, updateDocument, DocumentApi } from '@/services/documents-api';
 import { useAuth } from '@/contexts/auth-context';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
   WorkflowFormDialog,
   WorkflowTemplate,
@@ -61,6 +62,7 @@ import {
 import { toast } from 'sonner';
 
 export default function WorkflowsPage() {
+  const { t } = useI18n();
   const { user } = useAuth();
   const { getItems, getItemName } = useParameters();
 
@@ -325,12 +327,12 @@ export default function WorkflowsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Circuits de Validation (Workflows)"
-        subtitle="Pilotez les circuits de validation séquentiels, la validation en masse par type de document et vos modèles types"
+        title={t('workflows.title', 'Circuits de Visa & Validation')}
+        subtitle={t('workflows.subtitle', 'Pilotez les circuits de validation séquentiels, la validation en masse par type de document et vos modèles types')}
         icon={<WorkflowIcon className="h-6 w-6" />}
         exportData={exportData}
         exportFilename="workflows-circuits-validation"
-        exportTitle="Circuits de Validation & Workflows"
+        exportTitle={t('workflows.title', 'Circuits de Validation & Workflows')}
       />
 
       {/* Notification Rôle / Visas en attente */}

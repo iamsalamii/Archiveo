@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/table';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
     fetchPermissionMatrix,
     createRole,
@@ -69,6 +70,7 @@ const MODULE_LABELS: Record<string, string> = {
 };
 
 export default function SecurityPage() {
+    const { t } = useI18n();
     const { getItems } = useParameters();
 
     // Données du backend
@@ -224,8 +226,8 @@ export default function SecurityPage() {
     return (
         <div className="space-y-6">
             <PageHeader
-                title="Sécurité & Habilitations"
-                subtitle="Matrice des rôles, gestion des permissions et contrôle des accès"
+                title={t('security.title', 'Sécurité & Habilitations RBAC')}
+                subtitle={t('security.subtitle', 'Matrice des rôles, gestion des permissions et contrôle des accès')}
                 icon={<Shield className="h-6 w-6" />}
                 exportData={matrix.roles.map((r) => ({
                     Rôle: r.name,
@@ -233,11 +235,11 @@ export default function SecurityPage() {
                     Permissions: r.permissions?.map((p) => p.code).join(', ') || 'Aucune',
                 }))}
                 exportFilename="matrice-securite-roles"
-                exportTitle="Matrice des Rôles et Permissions"
+                exportTitle={t('security.title', 'Matrice des Rôles et Permissions')}
                 exportColumns={[
-                    { key: 'Rôle', label: 'Rôle' },
+                    { key: 'Rôle', label: t('common.role', 'Rôle') },
                     { key: 'Nb Permissions', label: 'Nombre de permissions' },
-                    { key: 'Permissions', label: 'Permissions accordées' },
+                    { key: 'Permissions', label: t('security.permissions', 'Permissions accordées') },
                 ]}
                 exportMetadata={{
                     subtitle: 'Matrice officielle de gouvernance des accès',

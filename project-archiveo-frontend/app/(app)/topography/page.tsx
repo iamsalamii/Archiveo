@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { ParameterSelect } from '@/components/shared/parameter-select';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
   Boxes,
   Warehouse,
@@ -57,9 +58,117 @@ export interface ArchiveBox {
 
 const STORAGE_KEY = 'archiveo_topography_boxes';
 
+const DEFAULT_BOXES: ArchiveBox[] = [
+  {
+    id: 'box-001',
+    code: 'BX-FIN-2014',
+    building: 'Bâtiment Principal A',
+    room: 'Magasin A',
+    bay: 'Travée T01',
+    shelf: 'Étagère E03',
+    title: 'Dossiers Fiscaux & Liasses Déclaratives 2014-2018',
+    department: 'Direction Financière',
+    retentionYear: 2028,
+    totalDocuments: 48,
+    status: 'full',
+  },
+  {
+    id: 'box-002',
+    code: 'BX-RH-2015',
+    building: 'Bâtiment Principal A',
+    room: 'Magasin A',
+    bay: 'Travée T02',
+    shelf: 'Étagère E01',
+    title: 'Dossiers du Personnel Salariés Sortis 2015-2019',
+    department: 'Ressources Humaines',
+    retentionYear: 2045,
+    totalDocuments: 32,
+    status: 'active',
+  },
+  {
+    id: 'box-003',
+    code: 'BX-JUR-FONC-01',
+    building: 'Bâtiment Principal A',
+    room: 'Coffre-fort Sécurisé',
+    bay: 'Travée T01',
+    shelf: 'Étagère E01',
+    title: 'Actes Notariés, Statuts Constitutifs & Titres Fonciers',
+    department: 'Direction Juridique',
+    retentionYear: 2055,
+    totalDocuments: 16,
+    status: 'archived',
+  },
+  {
+    id: 'box-004',
+    code: 'BX-ACH-2012',
+    building: "Dépôt Central d'Archivage",
+    room: 'Magasin B',
+    bay: 'Travée T03',
+    shelf: 'Étagère E04',
+    title: 'Contrats Fournisseurs Échus et Marchés Clos 2012-2016',
+    department: 'Achats & Logistique',
+    retentionYear: 2024,
+    totalDocuments: 64,
+    status: 'full',
+  },
+  {
+    id: 'box-005',
+    code: 'BX-DSI-2018',
+    building: 'Bâtiment Principal A',
+    room: 'Magasin A',
+    bay: 'Travée T04',
+    shelf: 'Étagère E02',
+    title: 'Bordereaux de Versement & Recettes Applicatives DSI',
+    department: "Systèmes d'Information",
+    retentionYear: 2030,
+    totalDocuments: 24,
+    status: 'active',
+  },
+  {
+    id: 'box-006',
+    code: 'BX-MED-2010',
+    building: 'Bâtiment Principal A',
+    room: 'Coffre-fort Sécurisé',
+    bay: 'Travée T01',
+    shelf: 'Étagère E02',
+    title: "Dossiers Médicaux & Fiches d'Aptitude au Travail",
+    department: 'Médecine du Travail',
+    retentionYear: 2050,
+    totalDocuments: 52,
+    status: 'archived',
+  },
+  {
+    id: 'box-007',
+    code: 'BX-PATR-001',
+    building: 'Bâtiment Annexe B',
+    room: 'Salle des Calques & Plans C',
+    bay: 'Travée T02',
+    shelf: 'Étagère E03',
+    title: "Plans d'Architecte & Permis de Construire Siège Social",
+    department: 'Patrimoine & Immobilier',
+    retentionYear: 2099,
+    totalDocuments: 14,
+    status: 'archived',
+  },
+  {
+    id: 'box-008',
+    code: 'BX-DIR-2023',
+    building: 'Bâtiment Principal A',
+    room: 'Magasin A',
+    bay: 'Travée T05',
+    shelf: 'Étagère E05',
+    title: "Procès-Verbaux des Conseils d'Administration 2020-2024",
+    department: 'Direction Générale',
+    retentionYear: 2054,
+    totalDocuments: 28,
+    status: 'active',
+  },
+];
+
 export default function TopographyPage() {
+  const { t } = useI18n();
   const { getItems, getItemName } = useParameters();
-  const [boxes, setBoxes] = useState<ArchiveBox[]>([]);
+  const [boxes, setBoxes] = useState<ArchiveBox[]>(DEFAULT_BOXES);
   const [isLoaded, setIsLoaded] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedBuilding, setSelectedBuilding] = useState<string>('all');
@@ -73,15 +182,22 @@ export default function TopographyPage() {
   const dynamicLocations = getItems('LOCATION');
   const dynamicRooms = getItems('ROOM');
 
-  // Charger depuis le stockage local (0 données mock imposées)
+  // Charger depuis le stockage local avec fallback
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
-        setBoxes(JSON.parse(saved));
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setBoxes(parsed);
+        } else {
+          setBoxes(DEFAULT_BOXES);
+        }
+      } else {
+        setBoxes(DEFAULT_BOXES);
       }
     } catch {
-      // ignore
+      setBoxes(DEFAULT_BOXES);
     } finally {
       setIsLoaded(true);
     }
@@ -543,8 +659,8 @@ export default function TopographyPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Topographie & Magasins d'Archives"
-        subtitle="Cartographie physique des rayonnages, travées, boîtes d'archives et impression d'étiquettes QR Code / Code-barres"
+        title={t('topography.title', "Topographie des Dépôts & Magasins")}
+        subtitle={t('topography.subtitle', "Cartographie physique des rayonnages, travées, boîtes d'archives et impression d'étiquettes QR Code / Code-barres")}
         icon={<Warehouse className="h-6 w-6" />}
         exportData={filteredBoxes.map((b) => ({
           'Code Carton': b.code,
@@ -558,7 +674,7 @@ export default function TopographyPage() {
           'Échéance Conservation': b.retentionYear,
         }))}
         exportFilename="inventaire-topographique-magasins"
-        exportTitle="Inventaire Topographique des Magasins d'Archives"
+        exportTitle={t('topography.title', "Inventaire Topographique des Magasins d'Archives")}
       />
 
       {/* Cartes métriques récapitulatives */}

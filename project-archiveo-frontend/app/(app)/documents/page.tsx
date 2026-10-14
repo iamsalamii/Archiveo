@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import {
   fetchDocuments, deleteDocument, validateDocument, downloadDocument, DocumentApi,
 } from '@/services/documents-api';
@@ -40,6 +41,7 @@ function statusVariant(status: string) {
 }
 
 export default function DocumentsPage() {
+  const { t } = useI18n();
   const { getItemName, getItems } = useParameters();
   const [docs, setDocs] = useState<DocumentApi[]>([]);
   const [loading, setLoading] = useState(true);
@@ -157,21 +159,21 @@ export default function DocumentsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Documents"
-        subtitle="Gestion électronique des documents et cycle de vie"
+        title={t('docs.title', 'Documents GED')}
+        subtitle={t('docs.subtitle', 'Gestion électronique des documents et cycle de vie')}
         icon={<FileText className="h-6 w-6" />}
         exportData={exportData}
         exportFilename="registre-documents-ged"
-        exportTitle="Registre des Documents GED"
+        exportTitle={t('docs.title', 'Registre des Documents GED')}
         exportColumns={[
-          { key: 'Référence', label: 'Référence' },
-          { key: 'Titre', label: 'Titre du document' },
-          { key: 'Type', label: 'Type' },
-          { key: 'Catégorie', label: 'Catégorie' },
-          { key: 'Service', label: 'Service' },
-          { key: 'Statut', label: 'Statut' },
-          { key: 'Taille', label: 'Taille' },
-          { key: 'Date création', label: 'Date création' },
+          { key: 'Référence', label: t('common.reference', 'Référence') },
+          { key: 'Titre', label: t('common.title', 'Titre') },
+          { key: 'Type', label: t('common.type', 'Type') },
+          { key: 'Catégorie', label: t('common.category', 'Catégorie') },
+          { key: 'Service', label: t('common.service', 'Service') },
+          { key: 'Statut', label: t('common.status', 'Statut') },
+          { key: 'Taille', label: t('common.size', 'Taille') },
+          { key: 'Date création', label: t('common.createdAt', 'Date création') },
         ]}
         exportMetadata={{
           subtitle: 'Inventaire officiel des documents GED archivés et actifs',
@@ -179,7 +181,7 @@ export default function DocumentsPage() {
         }}
         actions={
           <Button onClick={() => { setEditing(null); setFormOpen(true); }} className="gap-2 shadow-sm font-medium">
-            <Plus className="h-4 w-4" /> Nouveau document
+            <Plus className="h-4 w-4" /> {t('docs.new', 'Nouveau document')}
           </Button>
         }
       />
@@ -189,28 +191,28 @@ export default function DocumentsPage() {
         <CardContent className="grid gap-3 p-4 sm:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Rechercher..." className="pl-9" />
+            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder={t('docs.searchPlaceholder', 'Rechercher...')} className="pl-9" />
           </div>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger><SelectValue placeholder="Type" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t('common.type', 'Type')} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tous les types</SelectItem>
+              <SelectItem value="all">{t('docs.filterCategory', 'Tous les types')}</SelectItem>
               {getItems('DOC_TYPE').map((i) => (
                 <SelectItem key={i.id} value={i.code}>{i.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger><SelectValue placeholder="Statut" /></SelectTrigger>
+            <SelectTrigger><SelectValue placeholder={t('common.status', 'Statut')} /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Tous les statuts</SelectItem>
+              <SelectItem value="all">{t('docs.filterStatus', 'Tous les statuts')}</SelectItem>
               {getItems('DOC_STATUS').map((i) => (
                 <SelectItem key={i.id} value={i.code}>{i.name}</SelectItem>
               ))}
             </SelectContent>
           </Select>
           <div className="flex items-center text-sm font-medium text-muted-foreground">
-            {filtered.length} document(s) répertorié(s)
+            {filtered.length} {t('dashboard.totalDocuments', 'Documents')}
           </div>
         </CardContent>
       </Card>

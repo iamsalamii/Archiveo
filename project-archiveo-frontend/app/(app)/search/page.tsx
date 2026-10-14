@@ -11,12 +11,14 @@ import { Badge } from '@/components/ui/badge';
 import { ParameterSelect } from '@/components/shared/parameter-select';
 import { ColorBadge } from '@/components/shared/color-badge';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import { api } from '@/services/api';
 import type { GedDocument, SavedSearch } from '@/types';
 import { Search, Save, Star, Filter, X } from 'lucide-react';
 import { toast } from 'sonner';
 
 export default function SearchPage() {
+  const { t } = useI18n();
   const { getItemName, getItems, getItem } = useParameters();
   const router = useRouter();
   const [docs, setDocs] = useState<GedDocument[]>([]);
@@ -74,12 +76,12 @@ export default function SearchPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Recherche"
-        subtitle="Recherche simple, avancée et multicritère"
+        title={t('nav.search', 'Recherche multicritère')}
+        subtitle={t('ocr.subtitle', 'Recherche simple, avancée et multicritère')}
         icon={<Search className="h-6 w-6" />}
         actions={
           <Button variant="outline" className="gap-2" onClick={saveSearch}>
-            <Save className="h-4 w-4" /> Sauvegarder
+            <Save className="h-4 w-4" /> {t('common.save', 'Sauvegarder')}
           </Button>
         }
       />

@@ -10,12 +10,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { ParameterSelect } from '@/components/shared/parameter-select';
 import { useTheme } from '@/contexts/theme-context';
+import { useI18n } from '@/contexts/i18n-context';
 import { api } from '@/services/api';
 import { toast } from 'sonner';
 import type { OrganizationSettings, AppSettings } from '@/types';
 import { Settings, Building, Palette, SlidersHorizontal } from 'lucide-react';
 
 export default function SettingsPage() {
+  const { t } = useI18n();
   const { theme, setTheme } = useTheme();
   const [org, setOrg] = useState<OrganizationSettings | null>(null);
   const [app, setApp] = useState<AppSettings | null>(null);
@@ -44,8 +46,8 @@ export default function SettingsPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Paramètres"
-        subtitle="Configuration générale de l'organisation et de l'application"
+        title={t('settings.title', 'Paramètres Généraux')}
+        subtitle={t('settings.subtitle', "Configuration générale de l'organisation et de l'application")}
         icon={<Settings className="h-6 w-6" />}
         exportData={[
           { Categorie: 'Organisation', Parametre: 'Nom', Valeur: org.name },

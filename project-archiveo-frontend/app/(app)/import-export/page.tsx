@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useParameters } from '@/contexts/parameters-context';
+import { useI18n } from '@/contexts/i18n-context';
 import { api } from '@/services/api';
 import { fetchAllSignatures } from '@/services/signatures-api';
 import { exportToCsv, exportToJson, exportToXml, exportToExcel, exportToPdf } from '@/utils/export';
@@ -28,6 +29,7 @@ import {
 import { toast } from 'sonner';
 
 export default function ImportExportPage() {
+  const { t } = useI18n();
   const { groups } = useParameters();
   const [exportEntity, setExportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'users' | 'parameters' | 'loans' | 'workflows' | 'audit' | 'signatures' | 'topography' | 'ocr'>('documents');
   const [importEntity, setImportEntity] = useState<'documents' | 'archives' | 'correspondences' | 'loans' | 'workflows' | 'parameters' | 'users' | 'signatures' | 'topography' | 'ocr'>('documents');
@@ -294,8 +296,8 @@ export default function ImportExportPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Import / Export Universel"
-        subtitle="Exportez ou importez l'intégralité de vos documents, archives, topographie, OCR, prêts et paramètres"
+        title={t('importExport.title', 'Import & Export Universel')}
+        subtitle={t('importExport.subtitle', "Exportez ou importez l'intégralité de vos documents, archives, topographie, OCR, prêts et paramètres")}
         icon={<ArrowDownUp className="h-6 w-6" />}
       />
 
