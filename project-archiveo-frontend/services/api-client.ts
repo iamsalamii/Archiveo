@@ -11,10 +11,12 @@ export const tokenService = {
   },
   set: (token: string) => {
     if (typeof window === 'undefined') return;
+    invalidateApiCache();
     sessionStorage.setItem(TOKEN_KEY, token);
   },
   remove: () => {
     if (typeof window === 'undefined') return;
+    invalidateApiCache();
     sessionStorage.removeItem(TOKEN_KEY);
   },
 };
@@ -32,6 +34,7 @@ const DEFAULT_CACHE_TTL_MS = 25_000; // 25 secondes de rétention en mémoire po
  * Invalide le cache en mémoire (totalement ou par motif d'URL)
  */
 export function invalidateApiCache(pattern?: string) {
+  pendingGets.clear();
   if (!pattern) {
     memoryCache.clear();
     return;
@@ -48,36 +51,52 @@ async function apiFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const isGet = (options.method ?? 'GET').toUpperCase() === 'GET';
+  const method = (options.method ?? 'GET').toUpperCase();
+  const isGet = method === 'GET';
+  const token = tokenService.get();
+  const cacheKey = `${token ? token.slice(-16) : 'anon'}:${endpoint}`;
 
   if (isGet) {
-    // 1. Vérifier si une réponse récente et valide existe en cache mémoire
-    const cached = memoryCache.get(endpoint);
-    if (cached && Date.now() - cached.timestamp < DEFAULT_CACHE_TTL_MS) {
-      return cached.data as T;
+    // 1. Nettoyer les entrées expirées et vérifier si une réponse valide existe
+    const cached = memoryCache.get(cacheKey);
+    if (cached) {
+      if (Date.now() - cached.timestamp < DEFAULT_CACHE_TTL_MS) {
+        return cached.data as T;
+      } else {
+        memoryCache.delete(cacheKey);
+      }
     }
 
     // 2. Dédupliquer les requêtes concurrentes en vol
-    const pending = pendingGets.get(endpoint);
+    const pending = pendingGets.get(cacheKey);
     if (pending) return pending as Promise<T>;
+  } else {
+    // Invalider le cache avant la mutation pour couper les lectures en vol
+    invalidateApiCache();
   }
 
   const request = apiFetchInternal<T>(endpoint, options);
 
   if (isGet) {
-    pendingGets.set(endpoint, request);
+    pendingGets.set(cacheKey, request);
     request
       .then((data) => {
-        memoryCache.set(endpoint, { data, timestamp: Date.now() });
+        memoryCache.set(cacheKey, { data, timestamp: Date.now() });
       })
-      .finally(() => pendingGets.delete(endpoint))
+      .finally(() => pendingGets.delete(cacheKey))
       .catch(() => undefined);
+    return request;
   } else {
-    // Toute opération mutante (POST, PUT, DELETE) invalide le cache correspondant pour garantir la fraîcheur
-    invalidateApiCache();
+    try {
+      const result = await request;
+      // Invalidation après confirmation de l'écriture en base
+      invalidateApiCache();
+      return result;
+    } catch (error) {
+      invalidateApiCache();
+      throw error;
+    }
   }
-
-  return request;
 }
 
 async function apiFetchInternal<T>(

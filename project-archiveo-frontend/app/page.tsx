@@ -258,6 +258,9 @@ export default function LandingPage() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="font-mono text-xs font-semibold text-white">DOC-2025-001</span>
+                    <span className="rounded bg-slate-800 border border-slate-700 px-1.5 py-0.5 text-[10px] font-mono text-slate-300">
+                      SPÉCIMEN DIDACTIQUE
+                    </span>
                     <span className="rounded bg-emerald-950 border border-emerald-800 px-1.5 py-0.5 text-[10px] font-mono text-emerald-400">
                       SCELLÉ SHA-256
                     </span>
@@ -372,23 +375,23 @@ export default function LandingPage() {
                         CERTIFICAT D’INTÉGRITÉ
                       </div>
                       <p className="text-xs text-slate-400 mt-2">
-                        Le document a été contrôlé sans altération depuis son enregistrement le 12 Janvier 2025.
+                        Simulation illustrée du scellement cryptographique appliqué lors de la prise en charge définitive du document.
                       </p>
 
                       <div className="mt-4 rounded border border-slate-800 bg-slate-900 p-3 font-mono text-[10px] text-slate-300 break-all">
-                        <span className="text-slate-500 block">SHA-256 HASH :</span>
-                        e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
+                        <span className="text-slate-500 block mb-1">SHA-256 (PAYLOAD DU SPÉCIMEN) :</span>
+                        ba3a503ea55f31676ca1b58105368c622a135c3880f8d9bee1597f1d415f96be
                       </div>
                     </div>
 
                     <div className="space-y-2 pt-4 border-t border-slate-800 text-xs">
                       <div className="flex items-center justify-between text-slate-400">
-                        <span>Horodatage RFC 3161 :</span>
+                        <span>Horodatage specimen :</span>
                         <span className="font-mono text-slate-200">12/01/2025 09:41:22 UTC</span>
                       </div>
                       <div className="flex items-center justify-between text-slate-400">
-                        <span>Contrôle de conformité :</span>
-                        <span className="font-semibold text-emerald-400">Certifié ISO 15489</span>
+                        <span>Norme d'archivage :</span>
+                        <span className="font-semibold text-emerald-400">Conforme ISO 15489</span>
                       </div>
                     </div>
                   </div>
@@ -398,7 +401,7 @@ export default function LandingPage() {
               {activeTab === 'audit' && (
                 <div className="rounded-lg border border-slate-800 bg-slate-950 p-6">
                   <h4 className="text-xs font-mono uppercase tracking-widest text-slate-400 mb-4">
-                    JOURNAL D’AUDIT INFALSIFIABLE (REGISTRE DES TRANSACTIONS)
+                    JOURNAL D’AUDIT PROBATOIRE (SPÉCIMEN DU REGISTRE DES TRANSACTIONS)
                   </h4>
                   <div className="divide-y divide-slate-800 text-xs">
                     {[
@@ -425,6 +428,9 @@ export default function LandingPage() {
                       </div>
                     ))}
                   </div>
+                  <p className="text-[11px] text-slate-500 font-mono mt-4 pt-3 border-t border-slate-800">
+                    * Spécimen didactique : en production, chaque événement est journalisé de manière immuable avec horodatage serveur et traçabilité de l'adresse réseau.
+                  </p>
                 </div>
               )}
 

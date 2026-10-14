@@ -102,6 +102,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.ToTable("Documents");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Reference).IsUnique();
+            entity.HasIndex(e => new { e.IsActive, e.CreatedAt });
             entity.Property(e => e.Reference).IsRequired().HasMaxLength(50);
             entity.Property(e => e.Title).IsRequired().HasMaxLength(255);
             entity.Property(e => e.TypeId).IsRequired().HasMaxLength(50);
@@ -126,6 +127,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.ToTable("ArchiveRecords");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Reference).IsUnique();
+            entity.HasIndex(e => new { e.IsActive, e.ArchivedAt });
             entity.Property(e => e.Reference).IsRequired().HasMaxLength(50);
             entity.Property(e => e.Title).IsRequired().HasMaxLength(255);
             entity.Property(e => e.TypeId).IsRequired().HasMaxLength(50);
@@ -143,6 +145,7 @@ public class ApplicationDbContext : IdentityDbContext<User, IdentityRole<Guid>, 
             entity.ToTable("LoanRecords");
             entity.HasKey(e => e.Id);
             entity.HasIndex(e => e.Reference).IsUnique();
+            entity.HasIndex(e => new { e.IsActive, e.BorrowDate });
             entity.Property(e => e.Reference).IsRequired().HasMaxLength(50);
             entity.Property(e => e.BorrowerName).IsRequired().HasMaxLength(200);
             entity.Property(e => e.Status).IsRequired().HasMaxLength(50);
