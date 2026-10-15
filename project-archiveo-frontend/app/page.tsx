@@ -24,8 +24,6 @@ import {
   Download,
   Fingerprint,
 } from 'lucide-react';
-import { jsPDF } from 'jspdf';
-import autoTable from 'jspdf-autotable';
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState<'meta' | 'audit' | 'visa' | 'phys'>('meta');
@@ -244,8 +242,11 @@ export default function LandingPage() {
     }, 900);
   };
 
-  const downloadBrochure = () => {
+  const downloadBrochure = async () => {
     try {
+      const { jsPDF } = await import('jspdf');
+      const autoTableModule = await import('jspdf-autotable');
+      const autoTable = (autoTableModule.default || autoTableModule) as any;
       const doc = new jsPDF();
       doc.setFillColor(7, 12, 24);
       doc.rect(0, 0, 210, 40, 'F');
@@ -619,8 +620,17 @@ export default function LandingPage() {
         </section>
 
         {/* 4. LE THÉÂTRE DOCUMENTAIRE (COCKPIT LOGICIEL DYNAMIQUE) */}
-        <section className="py-24 px-6 sm:px-8 max-w-7xl mx-auto w-full" id="theatre-documentaire">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+        <section className="relative w-full py-24 border-y border-white/[0.06] bg-[#070c18] overflow-hidden" id="theatre-documentaire">
+          {/* Background image du domaine d'activité (Interface Studio & Cockpit) */}
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/digistudio_website.webp')` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#070c18_90%)] pointer-events-none" />
+
+          <div className="relative max-w-7xl mx-auto px-6 sm:px-8 w-full z-10">
+            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
             <div>
               <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.2em] block mb-2">
                 INTERFACE STUDIO // EXPÉRIENCE CONTRÔLE
@@ -907,6 +917,7 @@ export default function LandingPage() {
               )}
             </div>
           </div>
+          </div>
         </section>
 
         {/* 5. MARQUEE 2 : FLUX & MÉTRIQUES SOUVERAINES EN DIRECT */}
@@ -951,243 +962,328 @@ export default function LandingPage() {
         </section>
 
         {/* 6. BENTO GRID : LES 4 PILIERS FONCTIONNELS AVEC FONDS IMMERSIFS */}
-        <section className="py-24 px-6 sm:px-8 max-w-7xl mx-auto w-full" id="piliers-metier">
-          <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
-            <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.2em]">
-              ARCHITECTURE FONCTIONNELLE
-            </span>
-            <h2 className="font-serif text-3xl sm:text-4xl text-white">Quatre Piliers Indissociables</h2>
-            <p className="text-slate-400 text-sm sm:text-base">
-              Une infrastructure conçue sans concession pour les gouvernements, OIV et grands comptes réglementés.
-            </p>
-          </div>
+        <section className="relative w-full py-24 border-b border-white/[0.06] bg-[#050813] overflow-hidden" id="piliers-metier">
+          {/* Background image du domaine d'activité (Architecture Fonctionnelle) */}
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/outbox_website.webp')` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#050813_90%)] pointer-events-none" />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Pilier 1 */}
-            <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-300 flex flex-col justify-between p-8">
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/75 z-0 pointer-events-none" />
-              <div className="relative z-10 space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                  <Scan className="w-6 h-6" />
-                </div>
-                <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 01</span>
-                <h3 className="font-serif text-2xl text-white">GED &amp; Numérisation Fidèle</h3>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Ingestion à cadence industrielle, numérisation NF Z42-026 à valeur probante et classification sémantique automatique sans dépendance logicielle étrangère.
-                </p>
-              </div>
-              <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
-                <span>50M+ PIÈCES / AN</span>
-                <span className="text-blue-300 font-medium">MODULE ACTIF</span>
-              </div>
+          <div className="relative max-w-7xl mx-auto px-6 sm:px-8 w-full z-10">
+            <div className="text-center max-w-2xl mx-auto mb-16 space-y-3">
+              <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.2em]">
+                ARCHITECTURE FONCTIONNELLE
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl text-white">Quatre Piliers Indissociables</h2>
+              <p className="text-slate-400 text-sm sm:text-base">
+                Une infrastructure conçue sans concession pour les gouvernements, OIV et grands comptes réglementés.
+              </p>
             </div>
 
-            {/* Pilier 2 */}
-            <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-300 flex flex-col justify-between p-8">
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/75 z-0 pointer-events-none" />
-              <div className="relative z-10 space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                  <Key className="w-6 h-6" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Pilier 1 */}
+              <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-20 group-hover:opacity-35 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/assets/previews/guardnet-benefits.webp')` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
+                <div className="relative z-10 space-y-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                    <Scan className="w-6 h-6" />
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 01</span>
+                  <h3 className="font-serif text-2xl text-white">GED &amp; Numérisation Fidèle</h3>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    Ingestion à cadence industrielle, numérisation NF Z42-026 à valeur probante et classification sémantique automatique sans dépendance logicielle étrangère.
+                  </p>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 02</span>
-                <h3 className="font-serif text-2xl text-white">Parapheur Électronique Certifié</h3>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Circuits de décision formels, co-signatures hiérarchiques et sceau de personne morale eIDAS sur clés cryptographiques qualifiées ANSSI.
-                </p>
+                <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
+                  <span>50M+ PIÈCES / AN</span>
+                  <span className="text-blue-300 font-medium">MODULE ACTIF</span>
+                </div>
               </div>
-              <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
-                <span>RÈGLEMENT (UE) 910/2014</span>
-                <span className="text-blue-300 font-medium">MODULE ACTIF</span>
-              </div>
-            </div>
 
-            {/* Pilier 3 */}
-            <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-300 flex flex-col justify-between p-8">
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/75 z-0 pointer-events-none" />
-              <div className="relative z-10 space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                  <Clock className="w-6 h-6" />
+              {/* Pilier 2 */}
+              <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-20 group-hover:opacity-35 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/digital-vault.jpg')` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
+                <div className="relative z-10 space-y-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                    <Key className="w-6 h-6" />
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 02</span>
+                  <h3 className="font-serif text-2xl text-white">Parapheur Électronique Certifié</h3>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    Circuits de décision formels, co-signatures hiérarchiques et sceau de personne morale eIDAS sur clés cryptographiques qualifiées ANSSI.
+                  </p>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 03</span>
-                <h3 className="font-serif text-2xl text-white">Records Management &amp; DUA</h3>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Règle des 3 âges de l'archive selon l'ISO 15489. Pilotage précis des délais d'utilité administrative, gel judiciaire (Legal Hold) et PV d'élimination.
-                </p>
+                <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
+                  <span>RÈGLEMENT (UE) 910/2014</span>
+                  <span className="text-blue-300 font-medium">MODULE ACTIF</span>
+                </div>
               </div>
-              <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
-                <span>NORME ISO 15489-1:2016</span>
-                <span className="text-blue-300 font-medium">MODULE ACTIF</span>
-              </div>
-            </div>
 
-            {/* Pilier 4 */}
-            <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-300 flex flex-col justify-between p-8">
-              <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/75 z-0 pointer-events-none" />
-              <div className="relative z-10 space-y-4">
-                <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
-                  <Building className="w-6 h-6" />
+              {/* Pilier 3 */}
+              <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-20 group-hover:opacity-35 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/digistudio_website.webp')` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
+                <div className="relative z-10 space-y-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                    <Clock className="w-6 h-6" />
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 03</span>
+                  <h3 className="font-serif text-2xl text-white">Records Management &amp; DUA</h3>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    Règle des 3 âges de l'archive selon l'ISO 15489. Pilotage précis des délais d'utilité administrative, gel judiciaire (Legal Hold) et PV d'élimination.
+                  </p>
                 </div>
-                <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 04</span>
-                <h3 className="font-serif text-2xl text-white">Magasins d'Archives Physiques</h3>
-                <p className="text-slate-300 text-sm leading-relaxed">
-                  Cartographie 3D des entrepôts, gestion des prêts de cartons, suivi des sorties temporaires et récolement contradictoire par code optique.
-                </p>
+                <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
+                  <span>NORME ISO 15489-1:2016</span>
+                  <span className="text-blue-300 font-medium">MODULE ACTIF</span>
+                </div>
               </div>
-              <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
-                <span>MULTI-ENTREPÔTS</span>
-                <span className="text-blue-300 font-medium">MODULE ACTIF</span>
+
+              {/* Pilier 4 */}
+              <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/assets/previews/interior-features.webp')` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
+                <div className="relative z-10 space-y-4">
+                  <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-300 group-hover:scale-110 group-hover:bg-blue-600 group-hover:text-white transition-all duration-300">
+                    <Building className="w-6 h-6" />
+                  </div>
+                  <span className="font-mono text-[11px] text-slate-400 uppercase tracking-widest block">PILIER 04</span>
+                  <h3 className="font-serif text-2xl text-white">Magasins d'Archives Physiques</h3>
+                  <p className="text-slate-300 text-sm leading-relaxed">
+                    Cartographie 3D des entrepôts, gestion des prêts de cartons, suivi des sorties temporaires et récolement contradictoire par code optique.
+                  </p>
+                </div>
+                <div className="relative z-10 pt-6 mt-6 border-t border-white/[0.08] flex items-center justify-between font-mono text-xs text-slate-400">
+                  <span>MULTI-ENTREPÔTS</span>
+                  <span className="text-blue-300 font-medium">MODULE ACTIF</span>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         {/* 7. IMMERSION BENTO : MAGASINS & CENTRE DE COMMANDEMENT */}
-        <section className="py-20 px-6 sm:px-8 max-w-7xl mx-auto w-full" id="infrastructures">
-          <div className="space-y-3 max-w-2xl mb-12">
-            <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.2em]">
-              CONSERVATION HYBRIDE
-            </span>
-            <h2 className="font-serif text-3xl sm:text-4xl text-white">Du Rayonnage au Registre WORM</h2>
-            <p className="text-slate-400 text-sm sm:text-base">
-              La seule solution souveraine réconciliant des kilomètres d'archives tangibles avec des téraoctets de données scellées.
-            </p>
-          </div>
+        <section className="relative w-full py-24 border-b border-white/[0.06] bg-[#070c18] overflow-hidden" id="infrastructures">
+          {/* Background image du domaine d'activité (Conservation Hybride) */}
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/smart-warehouse.jpg')` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#070c18_90%)] pointer-events-none" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-            {/* Bento 1 : Magasins Physiques */}
-            <div className="lg:col-span-7 rounded-2xl bg-[#0e1526] border border-white/[0.08] overflow-hidden flex flex-col group hover:border-blue-400/40 transition-all duration-500">
-              <div className="relative w-full h-[360px] sm:h-[400px] overflow-hidden bg-gradient-to-br from-slate-900 via-slate-950 to-blue-950">
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-black/40 to-transparent" />
-                <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/[0.1] font-mono text-xs text-white">
-                  MAGASIN NIVEAU 3 • CLIMAT CONTRÔLÉ 18°C / 50% HR
-                </div>
-                <div className="absolute bottom-6 left-6 right-6">
-                  <span className="font-mono text-[11px] text-blue-300 uppercase">Topographie Physique</span>
-                  <h3 className="font-serif text-2xl text-white mt-1">Rayonnages industriels &amp; Récolement</h3>
-                  <p className="text-xs text-slate-300 mt-1 max-w-lg">
-                    Chaque boîte possède une géolocalisation spatiale (Entrepôt, Travée, Tablette) interconnectée à son jumeau numérique.
-                  </p>
-                </div>
-              </div>
-
-              <div className="p-6 grid grid-cols-3 gap-4 text-center border-t border-white/[0.08] bg-[#070c18]">
-                <div>
-                  <span className="font-mono text-[10px] text-slate-400 block uppercase">Capacité</span>
-                  <p className="font-serif text-xl text-white font-semibold mt-0.5">450 km</p>
-                  <p className="text-[11px] text-slate-500">Linéaires gérés</p>
-                </div>
-                <div className="border-x border-white/[0.08]">
-                  <span className="font-mono text-[10px] text-slate-400 block uppercase">Inventaire</span>
-                  <p className="font-serif text-xl text-white font-semibold mt-0.5">100%</p>
-                  <p className="text-[11px] text-slate-500">Conformité récolement</p>
-                </div>
-                <div>
-                  <span className="font-mono text-[10px] text-slate-400 block uppercase">Contrôle</span>
-                  <p className="font-serif text-xl text-white font-semibold mt-0.5">Zone 4</p>
-                  <p className="text-[11px] text-slate-500">Accès biométrique</p>
-                </div>
-              </div>
+          <div className="relative max-w-7xl mx-auto px-6 sm:px-8 w-full z-10">
+            <div className="space-y-3 max-w-2xl mb-12">
+              <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.2em]">
+                CONSERVATION HYBRIDE
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl text-white">Du Rayonnage au Registre WORM</h2>
+              <p className="text-slate-400 text-sm sm:text-base">
+                La seule solution souveraine réconciliant des kilomètres d'archives tangibles avec des téraoctets de données scellées.
+              </p>
             </div>
 
-            {/* Bento 2 : Centre de Commandement */}
-            <div className="lg:col-span-5 rounded-2xl bg-[#0e1526] border border-white/[0.08] overflow-hidden flex flex-col group hover:border-blue-400/40 transition-all duration-500">
-              <div className="relative w-full h-[360px] sm:h-[400px] overflow-hidden bg-gradient-to-br from-indigo-950 via-slate-950 to-slate-900">
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-black/40 to-transparent" />
-                <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/[0.1] font-mono text-xs text-white">
-                  AUDIT CONSOLE • RÔLE DIRECTEUR DU PATRIMOINE
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+              {/* Bento 1 : Magasins Physiques */}
+              <div className="lg:col-span-7 rounded-2xl bg-[#0e1526] border border-white/[0.08] overflow-hidden flex flex-col group hover:border-blue-400/40 transition-all duration-500">
+                <div className="relative w-full h-[360px] sm:h-[400px] overflow-hidden bg-slate-950">
+                  <img
+                    src="/assets/previews/interior-features.webp"
+                    alt="Magasins d'Archives Physiques Haute Densité"
+                    className="absolute inset-0 w-full h-full object-cover object-center opacity-45 group-hover:scale-105 group-hover:opacity-60 transition-all duration-700"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-black/40 to-transparent" />
+                  <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/[0.1] font-mono text-xs text-white">
+                    MAGASIN NIVEAU 3 • CLIMAT CONTRÔLÉ 18°C / 50% HR
+                  </div>
+                  <div className="absolute bottom-6 left-6 right-6">
+                    <span className="font-mono text-[11px] text-blue-300 uppercase">Topographie Physique</span>
+                    <h3 className="font-serif text-2xl text-white mt-1">Rayonnages industriels &amp; Récolement</h3>
+                    <p className="text-xs text-slate-300 mt-1 max-w-lg">
+                      Chaque boîte possède une géolocalisation spatiale (Entrepôt, Travée, Tablette) interconnectée à son jumeau numérique.
+                    </p>
+                  </div>
                 </div>
-                <div className="absolute bottom-6 left-6 right-6">
-                  <span className="font-mono text-[11px] text-blue-300 uppercase">Supervision Souveraine</span>
-                  <h3 className="font-serif text-2xl text-white mt-1">Gouvernance centralisée des DUA</h3>
-                  <p className="text-xs text-slate-300 mt-1">
-                    Pilotage des éliminations réglementaires et bordereaux de versement SEDA vers les Archives Nationales.
-                  </p>
+
+                <div className="p-6 grid grid-cols-3 gap-4 text-center border-t border-white/[0.08] bg-[#070c18]">
+                  <div>
+                    <span className="font-mono text-[10px] text-slate-400 block uppercase">Capacité</span>
+                    <p className="font-serif text-xl text-white font-semibold mt-0.5">450 km</p>
+                    <p className="text-[11px] text-slate-500">Linéaires gérés</p>
+                  </div>
+                  <div className="border-x border-white/[0.08]">
+                    <span className="font-mono text-[10px] text-slate-400 block uppercase">Inventaire</span>
+                    <p className="font-serif text-xl text-white font-semibold mt-0.5">100%</p>
+                    <p className="text-[11px] text-slate-500">Conformité récolement</p>
+                  </div>
+                  <div>
+                    <span className="font-mono text-[10px] text-slate-400 block uppercase">Contrôle</span>
+                    <p className="font-serif text-xl text-white font-semibold mt-0.5">Zone 4</p>
+                    <p className="text-[11px] text-slate-500">Accès biométrique</p>
+                  </div>
                 </div>
               </div>
 
-              <div className="p-6 flex flex-col justify-between flex-1 border-t border-white/[0.08] bg-[#070c18] space-y-4">
-                <div className="flex items-center justify-between font-mono text-xs">
-                  <span className="text-slate-300">SÉGRÉGATION CRYPTOGRAPHIQUE</span>
-                  <span className="text-blue-300 font-semibold">NIVEAU RGS</span>
+              {/* Bento 2 : Centre de Commandement */}
+              <div className="lg:col-span-5 rounded-2xl bg-[#0e1526] border border-white/[0.08] overflow-hidden flex flex-col group hover:border-blue-400/40 transition-all duration-500">
+                <div className="relative w-full h-[360px] sm:h-[400px] overflow-hidden bg-slate-950">
+                  <video
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    poster="/assets/previews/guardnet-benefits.webp"
+                    className="absolute inset-0 w-full h-full object-cover object-center opacity-50 group-hover:scale-105 group-hover:opacity-70 transition-all duration-700"
+                  >
+                    <source src="/images/vault_motion.mp4" type="video/mp4" />
+                  </video>
+                  <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-black/40 to-transparent" />
+                  <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/[0.1] font-mono text-xs text-white">
+                    AUDIT CONSOLE • RÔLE DIRECTEUR DU PATRIMOINE
+                  </div>
+                  <div className="absolute bottom-6 left-6 right-6">
+                    <span className="font-mono text-[11px] text-blue-300 uppercase">Supervision Souveraine</span>
+                    <h3 className="font-serif text-2xl text-white mt-1">Gouvernance centralisée des DUA</h3>
+                    <p className="text-xs text-slate-300 mt-1">
+                      Pilotage des éliminations réglementaires et bordereaux de versement SEDA vers les Archives Nationales.
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs text-slate-400">
-                  Cloisonnement strict par entité juridique. Aucune fuite de données inter-services.
-                </p>
-                <button
-                  onClick={() => {
-                    setDemoSuccess(false);
-                    setIsDemoModalOpen(true);
-                  }}
-                  className="w-full py-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-white font-mono text-xs uppercase tracking-wider transition-all duration-200"
-                >
-                  Voir le protocole d'habilitation
-                </button>
+
+                <div className="p-6 flex flex-col justify-between flex-1 border-t border-white/[0.08] bg-[#070c18] space-y-4">
+                  <div className="flex items-center justify-between font-mono text-xs">
+                    <span className="text-slate-300">SÉGRÉGATION CRYPTOGRAPHIQUE</span>
+                    <span className="text-blue-300 font-semibold">NIVEAU RGS</span>
+                  </div>
+                  <p className="text-xs text-slate-400">
+                    Cloisonnement strict par entité juridique. Aucune fuite de données inter-services.
+                  </p>
+                  <button
+                    onClick={() => {
+                      setDemoSuccess(false);
+                      setIsDemoModalOpen(true);
+                    }}
+                    className="w-full py-2.5 rounded-lg bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.1] text-white font-mono text-xs uppercase tracking-wider transition-all duration-200"
+                  >
+                    Voir le protocole d'habilitation
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
         {/* 8. CYCLE DE VIE DUA (LA DOCTRINE DES 3 ÂGES SELON LE SIAF) */}
-        <section className="py-24 px-6 sm:px-8 max-w-7xl mx-auto w-full border-t border-white/[0.07]" id="cycle-de-vie-dua">
-          <div className="max-w-2xl mb-16 space-y-3">
-            <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.2em]">
-              CYCLE DE VIE RÈGLEMENTAIRE
-            </span>
-            <h2 className="font-serif text-3xl sm:text-4xl text-white">La Doctrine des Trois Âges</h2>
-            <p className="text-slate-400 text-sm sm:text-base">
-              Conforme aux instructions du Service Interministériel des Archives de France (SIAF).
-            </p>
-          </div>
+        <section className="relative w-full py-24 border-t border-white/[0.07] bg-[#060a14] overflow-hidden" id="cycle-de-vie-dua">
+          {/* Background image du domaine d'activité (Cycle de Vie Réglementaire) */}
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/digistudio_website.webp')` }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#060a14_90%)] pointer-events-none" />
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="p-6 rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 transition-all duration-300 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300 font-mono text-xs">
-                  PHASE 01
-                </span>
-                <span className="font-mono text-xs text-slate-400">USAGE QUOTIDIEN</span>
-              </div>
-              <h3 className="font-serif text-xl text-white">Archives Courantes</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                Documents actifs nécessaires au fonctionnement immédiat des directions opérationnelles. Élaboration et parapheur de signature.
+          <div className="relative max-w-7xl mx-auto px-6 sm:px-8 w-full z-10">
+            <div className="max-w-2xl mb-16 space-y-3">
+              <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.2em]">
+                CYCLE DE VIE RÈGLEMENTAIRE
+              </span>
+              <h2 className="font-serif text-3xl sm:text-4xl text-white">La Doctrine des Trois Âges</h2>
+              <p className="text-slate-400 text-sm sm:text-base">
+                Conforme aux instructions du Service Interministériel des Archives de France (SIAF).
               </p>
-              <div className="pt-3 border-t border-white/[0.06] text-xs font-mono text-slate-400 space-y-1">
-                <div>• Marchés en cours d'exécution</div>
-                <div>• Dossiers agents en exercice</div>
-              </div>
             </div>
 
-            <div className="p-6 rounded-2xl bg-[#0e1526] border-2 border-blue-500/40 shadow-[0_0_30px_rgba(37,99,235,0.15)] transition-all duration-300 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded bg-blue-600 text-white font-mono text-xs font-semibold">
-                  PHASE 02 • CLÉ
-                </span>
-                <span className="font-mono text-xs text-blue-300 font-semibold">VALEUR PROBANTE</span>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Phase 01 */}
+              <div className="relative overflow-hidden group p-6 rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 transition-all duration-500 space-y-4">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-15 group-hover:opacity-30 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/hero-dashboard.jpg')` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/70 z-0 pointer-events-none" />
+                <div className="relative z-10 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-1 rounded bg-blue-500/10 border border-blue-500/20 text-blue-300 font-mono text-xs">
+                      PHASE 01
+                    </span>
+                    <span className="font-mono text-xs text-slate-400">USAGE QUOTIDIEN</span>
+                  </div>
+                  <h3 className="font-serif text-xl text-white">Archives Courantes</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    Documents actifs nécessaires au fonctionnement immédiat des directions opérationnelles. Élaboration et parapheur de signature.
+                  </p>
+                  <div className="pt-3 border-t border-white/[0.06] text-xs font-mono text-slate-400 space-y-1">
+                    <div>• Marchés en cours d'exécution</div>
+                    <div>• Dossiers agents en exercice</div>
+                  </div>
+                </div>
               </div>
-              <h3 className="font-serif text-xl text-white">Archives Intermédiaires (DUA)</h3>
-              <p className="text-xs text-slate-300 leading-relaxed">
-                Conservation probante obligatoire pour délais de recours légal et contrôles d'audit. Scellement WORM inaltérable.
-              </p>
-              <div className="pt-3 border-t border-white/[0.06] text-xs font-mono text-slate-400 space-y-1">
-                <div>• Coffre-fort numérique souverain</div>
-                <div>• Magasins physiques climatisés</div>
-              </div>
-            </div>
 
-            <div className="p-6 rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 transition-all duration-300 space-y-4">
-              <div className="flex items-center justify-between">
-                <span className="px-2.5 py-1 rounded bg-white/[0.05] border border-white/[0.1] text-slate-300 font-mono text-xs">
-                  PHASE 03
-                </span>
-                <span className="font-mono text-xs text-slate-400">SORT FINAL</span>
+              {/* Phase 02 */}
+              <div className="relative overflow-hidden group p-6 rounded-2xl bg-[#0e1526] border-2 border-blue-500/40 shadow-[0_0_30px_rgba(37,99,235,0.15)] hover:border-blue-400 hover:shadow-[0_0_40px_rgba(37,99,235,0.3)] hover:-translate-y-1 transition-all duration-500 space-y-4">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/assets/previews/guardnet-benefits.webp')` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/85 to-[#0a1020]/60 z-0 pointer-events-none" />
+                <div className="relative z-10 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-1 rounded bg-blue-600 text-white font-mono text-xs font-semibold">
+                      PHASE 02 • CLÉ
+                    </span>
+                    <span className="font-mono text-xs text-blue-300 font-semibold">VALEUR PROBANTE</span>
+                  </div>
+                  <h3 className="font-serif text-xl text-white">Archives Intermédiaires (DUA)</h3>
+                  <p className="text-xs text-slate-300 leading-relaxed">
+                    Conservation probante obligatoire pour délais de recours légal et contrôles d'audit. Scellement WORM inaltérable.
+                  </p>
+                  <div className="pt-3 border-t border-white/[0.06] text-xs font-mono text-slate-400 space-y-1">
+                    <div>• Coffre-fort numérique souverain</div>
+                    <div>• Magasins physiques climatisés</div>
+                  </div>
+                </div>
               </div>
-              <h3 className="font-serif text-xl text-white">Versement ou Destruction</h3>
-              <p className="text-xs text-slate-400 leading-relaxed">
-                À l'échéance de la DUA : versement pérenne aux Archives d'État (format SEDA) ou destruction sécurisée par procès-verbal légal.
-              </p>
-              <div className="pt-3 border-t border-white/[0.06] text-xs font-mono text-slate-400 space-y-1">
-                <div>• Versement historique SEDA</div>
-                <div>• Écrasement cryptographique certifié</div>
+
+              {/* Phase 03 */}
+              <div className="relative overflow-hidden group p-6 rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 transition-all duration-500 space-y-4">
+                <div
+                  className="absolute inset-0 bg-cover bg-center opacity-15 group-hover:opacity-30 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/assets/previews/interior-features.webp')` }}
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/70 z-0 pointer-events-none" />
+                <div className="relative z-10 space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="px-2.5 py-1 rounded bg-white/[0.05] border border-white/[0.1] text-slate-300 font-mono text-xs">
+                      PHASE 03
+                    </span>
+                    <span className="font-mono text-xs text-slate-400">SORT FINAL</span>
+                  </div>
+                  <h3 className="font-serif text-xl text-white">Versement ou Destruction</h3>
+                  <p className="text-xs text-slate-400 leading-relaxed">
+                    À l'échéance de la DUA : versement pérenne aux Archives d'État (format SEDA) ou destruction sécurisée par procès-verbal légal.
+                  </p>
+                  <div className="pt-3 border-t border-white/[0.06] text-xs font-mono text-slate-400 space-y-1">
+                    <div>• Versement historique SEDA</div>
+                    <div>• Écrasement cryptographique certifié</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -1195,8 +1291,13 @@ export default function LandingPage() {
 
         {/* 9. BANDEAU SÉCURITÉ & AUDIT CADRE DE CONFORMITÉ */}
         <section className="py-20 px-6 sm:px-8 max-w-7xl mx-auto w-full border-t border-white/[0.07]" id="cadre-securite">
-          <div className="rounded-2xl bg-gradient-to-br from-[#0e1526] via-[#0a1020] to-[#070c18] border border-white/[0.1] p-8 lg:p-12">
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0e1526] via-[#0a1020] to-[#070c18] border border-white/[0.1] p-8 lg:p-12">
+            <div
+              className="absolute inset-0 bg-cover bg-right opacity-15 pointer-events-none mix-blend-luminosity scale-105"
+              style={{ backgroundImage: `url('/assets/previews/guardnet-benefits.webp')` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-[#0a1020] via-[#0a1020]/90 to-transparent pointer-events-none" />
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
               <div className="lg:col-span-8 space-y-4">
                 <div className="flex items-center gap-2 text-xs font-mono text-blue-300 uppercase">
                   <Shield className="w-4 h-4" />
@@ -1231,7 +1332,25 @@ export default function LandingPage() {
         </section>
 
         {/* 10. APPEL À L'ACTION FINAL */}
-        <section className="w-full bg-[#050813] border-t border-white/[0.08] py-20 px-6 sm:px-8 relative overflow-hidden">
+        <section className="relative w-full bg-[#050813] border-t border-white/[0.08] py-28 px-6 sm:px-8 overflow-hidden">
+          {/* Background Image & Motion Video Domaine d'activité (Souveraineté Documentaire) */}
+          <div
+            className="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/digital-vault.jpg')` }}
+          />
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            poster="/images/digital-vault.jpg"
+            className="absolute inset-0 w-full h-full object-cover object-center opacity-20 pointer-events-none mix-blend-screen"
+          >
+            <source src="/images/vault_motion.mp4" type="video/mp4" />
+          </video>
+          <div className="absolute inset-0 bg-gradient-to-b from-[#050813] via-[#050813]/85 to-[#040711] pointer-events-none" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#050813_90%)] pointer-events-none" />
+
           <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">
             <span className="font-mono text-xs text-blue-300 uppercase tracking-[0.25em] block">
               SOUVERAINETÉ DOCUMENTAIRE
