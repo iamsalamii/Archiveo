@@ -24,6 +24,7 @@ import {
   Download,
   Fingerprint,
 } from 'lucide-react';
+import { exportToPdf } from '@/utils/export';
 
 export default function LandingPage() {
   const [activeTab, setActiveTab] = useState<'meta' | 'audit' | 'visa' | 'phys'>('meta');
@@ -31,7 +32,40 @@ export default function LandingPage() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isSubmittingDemo, setIsSubmittingDemo] = useState(false);
   const [demoSuccess, setDemoSuccess] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
   const canvasRef = useRef<HTMLDivElement>(null);
+
+  const handleExportSpecimenPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const data = [
+        { Paramètre: 'Identifiant Document', Valeur: 'DOC-2025-001' },
+        { Paramètre: 'Titre de l’Archive', Valeur: 'Convention quadriennale audit financier & commissariat aux comptes' },
+        { Paramètre: 'Tiers Contractant', Valeur: 'Deloitte & Associés' },
+        { Paramètre: 'Payload Canonique Exact', Valeur: 'DOC-2025-001|Convention quadriennale audit financier|Deloitte|2025-01-12' },
+        { Paramètre: 'Empreinte Cryptographique Racine (SHA-256)', Valeur: 'ba3a503ea55f31676ca1b58105368c622a135c3880f8d9bee1597f1d415f96be' },
+        { Paramètre: 'Horodatage du Spécimen', Valeur: '12 Janvier 2025 09:15:01 UTC (Simulation Didactique)' },
+        { Paramètre: 'Règle de Rétention (DUA)', Valeur: '10 ans — Norme ISO 15489-1:2016' },
+        { Paramètre: 'Statut du Spécimen', Valeur: 'SPÉCIMEN DIDACTIQUE — ARCHIVÉO TRUST ENGINE' },
+      ];
+
+      await exportToPdf(
+        data,
+        'Certificat de Scellement Didactique — DOC-2025-001',
+        [
+          { key: 'Paramètre', label: 'Paramètre Probatoire' },
+          { key: 'Valeur', label: 'Valeur Certifiée' },
+        ],
+        {
+          subtitle: 'Attestation didactique d’intégrité et de scellement SHA-256 WORM',
+          organization: 'ARCHIVÉO TRUST SERVICES — ENCLAVE SOUVERAINE',
+          filterSummary: 'Spécimen didactique de laboratoire (Démonstration)',
+        }
+      );
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   const [demoForm, setDemoForm] = useState({
     fullName: '',
@@ -772,17 +806,49 @@ export default function LandingPage() {
               {/* Volet 2 : Preuve SHA-256 */}
               {activeTab === 'audit' && (
                 <div className="p-6 sm:p-8 space-y-6">
-                  <div className="p-5 rounded-xl bg-[#060a14] border border-white/[0.08] space-y-2">
-                    <div className="flex items-center justify-between text-xs font-mono">
-                      <span className="text-slate-400 uppercase">Empreinte Cryptographique Racine (SHA-256)</span>
-                      <span className="text-blue-300 font-medium">RECONSOLIDÉ WORM</span>
+                  <div className="p-5 rounded-xl bg-[#060a14] border border-white/[0.08] space-y-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2 text-xs font-mono">
+                      <div className="flex items-center gap-2">
+                        <span className="text-slate-400 uppercase">Empreinte Cryptographique Racine (SHA-256)</span>
+                        <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px]">
+                          SPÉCIMEN DIDACTIQUE
+                        </span>
+                      </div>
+                      <span className="text-emerald-400 font-medium">CONTRÔLE INTÉGRITÉ 100% OK</span>
                     </div>
-                    <div className="p-3.5 bg-black/60 border border-white/[0.08] rounded-lg text-blue-300 font-mono text-xs break-all select-all">
-                      ba3a503ea55f31676ca1b58105368c622a135c3880f8d9bee1597f1d415f96be
+
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-mono text-slate-400">
+                        Payload canonique d'origine (chaîne sérialisée) :
+                      </div>
+                      <div className="p-2.5 bg-black/80 border border-white/[0.06] rounded font-mono text-[11px] text-slate-300 select-all">
+                        DOC-2025-001|Convention quadriennale audit financier|Deloitte|2025-01-12
+                      </div>
                     </div>
-                    <p className="text-[11px] text-slate-500 font-mono">
-                      * Empreinte spécimen calculée sur le payload du contrat légal (DOC-2025-001 / Deloitte &amp; Associés).
-                    </p>
+
+                    <div className="space-y-2">
+                      <div className="text-[11px] font-mono text-slate-400">
+                        Empreinte SHA-256 exacte calculée :
+                      </div>
+                      <div className="p-3 bg-black/90 border border-blue-500/30 rounded-lg text-blue-300 font-mono text-xs break-all select-all font-semibold">
+                        ba3a503ea55f31676ca1b58105368c622a135c3880f8d9bee1597f1d415f96be
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center justify-between gap-4 pt-2">
+                      <p className="text-[11px] text-slate-500 font-mono max-w-xl leading-relaxed">
+                        * Démonstration didactique : en production, chaque dépôt déclenche un hachage matériel en enclave WORM et une attestation délivrée par une Autorité d'Horodatage (TSA) qualifiée eIDAS / RFC 3161.
+                      </p>
+
+                      <button
+                        onClick={handleExportSpecimenPdf}
+                        disabled={isExportingPdf}
+                        className="px-4 py-2.5 rounded-lg bg-blue-600/20 hover:bg-blue-600/30 border border-blue-400/40 text-blue-300 hover:text-white font-mono text-xs uppercase tracking-wider flex items-center gap-2 transition-all duration-200 disabled:opacity-50"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>{isExportingPdf ? 'Génération...' : 'Télécharger le Certificat (PDF)'}</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -800,8 +866,8 @@ export default function LandingPage() {
                         <span>09:15:01</span>
                         <span className="text-blue-300">HORODATAGE</span>
                       </div>
-                      <p className="font-mono text-xs text-white font-medium">RFC 3161 Scellé</p>
-                      <span className="font-mono text-[10px] text-slate-500 block">Chambre Tiers de Confiance</span>
+                      <p className="font-mono text-xs text-white font-medium">Modèle RFC 3161</p>
+                      <span className="font-mono text-[10px] text-slate-500 block">Architecture Tiers de Confiance</span>
                     </div>
 
                     <div className="p-4 rounded-xl bg-[#0e1526] border border-white/[0.06] space-y-2">

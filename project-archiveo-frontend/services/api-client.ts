@@ -3,6 +3,26 @@ export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://loca
 // Le token est limité à la session du navigateur.
 const TOKEN_KEY = 'archiveo_token';
 
+// Compteur de génération de session pour neutraliser les requêtes en vol en cas de déconnexion / changement d'utilisateur
+let sessionGeneration = 0;
+
+/**
+ * Calcule une empreinte cryptographique déterministe (64-bit mix FNV-1a / Murmur) sur l'intégralité du jeton.
+ * Garantit l'absence de collision sans journaliser ni stocker le jeton en clair dans la clé.
+ */
+function hashToken(token: string): string {
+  let h1 = 0xdeadbeef ^ 0;
+  let h2 = 0x41c6ce57 ^ 0;
+  for (let i = 0; i < token.length; i++) {
+    const ch = token.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (h2 >>> 0).toString(16).padStart(8, '0') + (h1 >>> 0).toString(16).padStart(8, '0');
+}
+
 // Gestion du token
 export const tokenService = {
   get: () => {
@@ -11,11 +31,13 @@ export const tokenService = {
   },
   set: (token: string) => {
     if (typeof window === 'undefined') return;
+    sessionGeneration++;
     invalidateApiCache();
     sessionStorage.setItem(TOKEN_KEY, token);
   },
   remove: () => {
     if (typeof window === 'undefined') return;
+    sessionGeneration++;
     invalidateApiCache();
     sessionStorage.removeItem(TOKEN_KEY);
   },
@@ -54,7 +76,9 @@ async function apiFetch<T>(
   const method = (options.method ?? 'GET').toUpperCase();
   const isGet = method === 'GET';
   const token = tokenService.get();
-  const cacheKey = `${token ? token.slice(-16) : 'anon'}:${endpoint}`;
+  const currentGen = sessionGeneration;
+  const tokenFingerprint = token ? hashToken(token) : 'anon';
+  const cacheKey = `${tokenFingerprint}:${endpoint}`;
 
   if (isGet) {
     // 1. Nettoyer les entrées expirées et vérifier si une réponse valide existe
@@ -75,15 +99,23 @@ async function apiFetch<T>(
     invalidateApiCache();
   }
 
-  const request = apiFetchInternal<T>(endpoint, options);
+  const request = apiFetchInternal<T>(endpoint, options, token);
 
   if (isGet) {
     pendingGets.set(cacheKey, request);
     request
       .then((data) => {
-        memoryCache.set(cacheKey, { data, timestamp: Date.now() });
+        // Protection de course stricte : si la session a été invalidée (déconnexion ou changement
+        // de compte) pendant l'attente réseau, on rejette l'écriture en cache
+        if (sessionGeneration === currentGen && tokenService.get() === token) {
+          memoryCache.set(cacheKey, { data, timestamp: Date.now() });
+        }
       })
-      .finally(() => pendingGets.delete(cacheKey))
+      .finally(() => {
+        if (pendingGets.get(cacheKey) === request) {
+          pendingGets.delete(cacheKey);
+        }
+      })
       .catch(() => undefined);
     return request;
   } else {
@@ -101,9 +133,10 @@ async function apiFetch<T>(
 
 async function apiFetchInternal<T>(
   endpoint: string,
-  options: RequestInit
+  options: RequestInit,
+  explicitToken?: string | null
 ): Promise<T> {
-  const token = tokenService.get();
+  const token = explicitToken !== undefined ? explicitToken : tokenService.get();
 
   const headers: HeadersInit = {
     'Content-Type': 'application/json',

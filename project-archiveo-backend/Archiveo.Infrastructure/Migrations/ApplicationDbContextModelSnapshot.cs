@@ -117,6 +117,8 @@ namespace Archiveo.Infrastructure.Migrations
                     b.HasIndex("Reference")
                         .IsUnique();
 
+                    b.HasIndex("IsActive", "ArchivedAt");
+
                     b.ToTable("ArchiveRecords", (string)null);
                 });
 
@@ -402,6 +404,8 @@ namespace Archiveo.Infrastructure.Migrations
                     b.HasIndex("Reference")
                         .IsUnique();
 
+                    b.HasIndex("IsActive", "CreatedAt");
+
                     b.ToTable("Documents", (string)null);
                 });
 
@@ -645,6 +649,8 @@ namespace Archiveo.Infrastructure.Migrations
 
                     b.HasIndex("Reference")
                         .IsUnique();
+
+                    b.HasIndex("IsActive", "BorrowDate");
 
                     b.ToTable("LoanRecords", (string)null);
                 });
