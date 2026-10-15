@@ -621,10 +621,10 @@ export default function LandingPage() {
 
         {/* 4. LE THÉÂTRE DOCUMENTAIRE (COCKPIT LOGICIEL DYNAMIQUE) */}
         <section className="relative w-full py-24 border-y border-white/[0.06] bg-[#070c18] overflow-hidden" id="theatre-documentaire">
-          {/* Background image du domaine d'activité (Interface Studio & Cockpit) */}
+          {/* Background image du domaine d'activité (Interface Studio & Cockpit Archivéo) */}
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
-            style={{ backgroundImage: `url('/images/digistudio_website.webp')` }}
+            className="absolute inset-0 bg-cover bg-center opacity-15 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/studio-cockpit-bg.jpg')` }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#070c18_90%)] pointer-events-none" />
@@ -965,8 +965,8 @@ export default function LandingPage() {
         <section className="relative w-full py-24 border-b border-white/[0.06] bg-[#050813] overflow-hidden" id="piliers-metier">
           {/* Background image du domaine d'activité (Architecture Fonctionnelle) */}
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
-            style={{ backgroundImage: `url('/images/outbox_website.webp')` }}
+            className="absolute inset-0 bg-cover bg-center opacity-15 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/functional-arch-bg.jpg')` }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#050813_90%)] pointer-events-none" />
@@ -986,8 +986,8 @@ export default function LandingPage() {
               {/* Pilier 1 */}
               <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
                 <div
-                  className="absolute inset-0 bg-cover bg-center opacity-20 group-hover:opacity-35 group-hover:scale-105 transition-all duration-700 pointer-events-none"
-                  style={{ backgroundImage: `url('/assets/previews/guardnet-benefits.webp')` }}
+                  className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/card-ged-scanning.jpg')` }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
                 <div className="relative z-10 space-y-4">
@@ -1009,8 +1009,8 @@ export default function LandingPage() {
               {/* Pilier 2 */}
               <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
                 <div
-                  className="absolute inset-0 bg-cover bg-center opacity-20 group-hover:opacity-35 group-hover:scale-105 transition-all duration-700 pointer-events-none"
-                  style={{ backgroundImage: `url('/images/digital-vault.jpg')` }}
+                  className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/card-parapheur.jpg')` }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
                 <div className="relative z-10 space-y-4">
@@ -1032,8 +1032,8 @@ export default function LandingPage() {
               {/* Pilier 3 */}
               <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
                 <div
-                  className="absolute inset-0 bg-cover bg-center opacity-20 group-hover:opacity-35 group-hover:scale-105 transition-all duration-700 pointer-events-none"
-                  style={{ backgroundImage: `url('/images/digistudio_website.webp')` }}
+                  className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/card-records-dua.jpg')` }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
                 <div className="relative z-10 space-y-4">
@@ -1056,7 +1056,7 @@ export default function LandingPage() {
               <div className="relative overflow-hidden group rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 hover:shadow-[0_20px_40px_rgba(0,0,0,0.5)] transition-all duration-500 flex flex-col justify-between p-8">
                 <div
                   className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
-                  style={{ backgroundImage: `url('/assets/previews/interior-features.webp')` }}
+                  style={{ backgroundImage: `url('/images/card-physical-warehouse.jpg')` }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/65 z-0 pointer-events-none" />
                 <div className="relative z-10 space-y-4">
@@ -1083,7 +1083,7 @@ export default function LandingPage() {
           {/* Background image du domaine d'activité (Conservation Hybride) */}
           <div
             className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
-            style={{ backgroundImage: `url('/images/smart-warehouse.jpg')` }}
+            style={{ backgroundImage: `url('/images/card-physical-warehouse.jpg')` }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#070c18_90%)] pointer-events-none" />
@@ -1104,9 +1104,9 @@ export default function LandingPage() {
               <div className="lg:col-span-7 rounded-2xl bg-[#0e1526] border border-white/[0.08] overflow-hidden flex flex-col group hover:border-blue-400/40 transition-all duration-500">
                 <div className="relative w-full h-[360px] sm:h-[400px] overflow-hidden bg-slate-950">
                   <img
-                    src="/assets/previews/interior-features.webp"
+                    src="/images/card-physical-warehouse.jpg"
                     alt="Magasins d'Archives Physiques Haute Densité"
-                    className="absolute inset-0 w-full h-full object-cover object-center opacity-45 group-hover:scale-105 group-hover:opacity-60 transition-all duration-700"
+                    className="absolute inset-0 w-full h-full object-cover object-center opacity-55 group-hover:scale-105 group-hover:opacity-70 transition-all duration-700"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-black/40 to-transparent" />
                   <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/[0.1] font-mono text-xs text-white">
@@ -1143,16 +1143,11 @@ export default function LandingPage() {
               {/* Bento 2 : Centre de Commandement */}
               <div className="lg:col-span-5 rounded-2xl bg-[#0e1526] border border-white/[0.08] overflow-hidden flex flex-col group hover:border-blue-400/40 transition-all duration-500">
                 <div className="relative w-full h-[360px] sm:h-[400px] overflow-hidden bg-slate-950">
-                  <video
-                    autoPlay
-                    loop
-                    muted
-                    playsInline
-                    poster="/assets/previews/guardnet-benefits.webp"
-                    className="absolute inset-0 w-full h-full object-cover object-center opacity-50 group-hover:scale-105 group-hover:opacity-70 transition-all duration-700"
-                  >
-                    <source src="/images/vault_motion.mp4" type="video/mp4" />
-                  </video>
+                  <img
+                    src="/images/card-soc-command.jpg"
+                    alt="Centre de Commandement & Coffre WORM"
+                    className="absolute inset-0 w-full h-full object-cover object-center opacity-65 group-hover:scale-105 group-hover:opacity-80 transition-all duration-700"
+                  />
                   <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-black/40 to-transparent" />
                   <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-black/80 backdrop-blur-md border border-white/[0.1] font-mono text-xs text-white">
                     AUDIT CONSOLE • RÔLE DIRECTEUR DU PATRIMOINE
@@ -1193,8 +1188,8 @@ export default function LandingPage() {
         <section className="relative w-full py-24 border-t border-white/[0.07] bg-[#060a14] overflow-hidden" id="cycle-de-vie-dua">
           {/* Background image du domaine d'activité (Cycle de Vie Réglementaire) */}
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-10 pointer-events-none mix-blend-luminosity scale-105"
-            style={{ backgroundImage: `url('/images/digistudio_website.webp')` }}
+            className="absolute inset-0 bg-cover bg-center opacity-15 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/cycle-de-vie-bg.jpg')` }}
           />
           <div className="absolute inset-0 bg-gradient-to-b from-[#070c18] via-transparent to-[#070c18] pointer-events-none" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#060a14_90%)] pointer-events-none" />
@@ -1214,8 +1209,8 @@ export default function LandingPage() {
               {/* Phase 01 */}
               <div className="relative overflow-hidden group p-6 rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 transition-all duration-500 space-y-4">
                 <div
-                  className="absolute inset-0 bg-cover bg-center opacity-15 group-hover:opacity-30 group-hover:scale-105 transition-all duration-700 pointer-events-none"
-                  style={{ backgroundImage: `url('/images/hero-dashboard.jpg')` }}
+                  className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/card-ged-scanning.jpg')` }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/70 z-0 pointer-events-none" />
                 <div className="relative z-10 space-y-4">
@@ -1240,7 +1235,7 @@ export default function LandingPage() {
               <div className="relative overflow-hidden group p-6 rounded-2xl bg-[#0e1526] border-2 border-blue-500/40 shadow-[0_0_30px_rgba(37,99,235,0.15)] hover:border-blue-400 hover:shadow-[0_0_40px_rgba(37,99,235,0.3)] hover:-translate-y-1 transition-all duration-500 space-y-4">
                 <div
                   className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
-                  style={{ backgroundImage: `url('/assets/previews/guardnet-benefits.webp')` }}
+                  style={{ backgroundImage: `url('/images/card-records-dua.jpg')` }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/85 to-[#0a1020]/60 z-0 pointer-events-none" />
                 <div className="relative z-10 space-y-4">
@@ -1264,8 +1259,8 @@ export default function LandingPage() {
               {/* Phase 03 */}
               <div className="relative overflow-hidden group p-6 rounded-2xl bg-[#0e1526] border border-white/[0.08] hover:border-blue-400/40 hover:-translate-y-1 transition-all duration-500 space-y-4">
                 <div
-                  className="absolute inset-0 bg-cover bg-center opacity-15 group-hover:opacity-30 group-hover:scale-105 transition-all duration-700 pointer-events-none"
-                  style={{ backgroundImage: `url('/assets/previews/interior-features.webp')` }}
+                  className="absolute inset-0 bg-cover bg-center opacity-25 group-hover:opacity-40 group-hover:scale-105 transition-all duration-700 pointer-events-none"
+                  style={{ backgroundImage: `url('/images/card-physical-warehouse.jpg')` }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-[#0a1020] via-[#0a1020]/90 to-[#0a1020]/70 z-0 pointer-events-none" />
                 <div className="relative z-10 space-y-4">
@@ -1294,7 +1289,7 @@ export default function LandingPage() {
           <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-[#0e1526] via-[#0a1020] to-[#070c18] border border-white/[0.1] p-8 lg:p-12">
             <div
               className="absolute inset-0 bg-cover bg-right opacity-15 pointer-events-none mix-blend-luminosity scale-105"
-              style={{ backgroundImage: `url('/assets/previews/guardnet-benefits.webp')` }}
+              style={{ backgroundImage: `url('/images/card-soc-command.jpg')` }}
             />
             <div className="absolute inset-0 bg-gradient-to-r from-[#0a1020] via-[#0a1020]/90 to-transparent pointer-events-none" />
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center relative z-10">
@@ -1333,22 +1328,12 @@ export default function LandingPage() {
 
         {/* 10. APPEL À L'ACTION FINAL */}
         <section className="relative w-full bg-[#050813] border-t border-white/[0.08] py-28 px-6 sm:px-8 overflow-hidden">
-          {/* Background Image & Motion Video Domaine d'activité (Souveraineté Documentaire) */}
+          {/* Background Image Domaine d'activité (Sanctuaire de Souveraineté Documentaire) */}
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-25 pointer-events-none mix-blend-luminosity scale-105"
-            style={{ backgroundImage: `url('/images/digital-vault.jpg')` }}
+            className="absolute inset-0 bg-cover bg-center opacity-30 pointer-events-none mix-blend-luminosity scale-105"
+            style={{ backgroundImage: `url('/images/sovereignty-sanctuary-bg.jpg')` }}
           />
-          <video
-            autoPlay
-            loop
-            muted
-            playsInline
-            poster="/images/digital-vault.jpg"
-            className="absolute inset-0 w-full h-full object-cover object-center opacity-20 pointer-events-none mix-blend-screen"
-          >
-            <source src="/images/vault_motion.mp4" type="video/mp4" />
-          </video>
-          <div className="absolute inset-0 bg-gradient-to-b from-[#050813] via-[#050813]/85 to-[#040711] pointer-events-none" />
+          <div className="absolute inset-0 bg-gradient-to-t from-[#050813] via-[#050813]/80 to-[#050813]/90 pointer-events-none" />
           <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_20%,#050813_90%)] pointer-events-none" />
 
           <div className="max-w-4xl mx-auto text-center space-y-6 relative z-10">
