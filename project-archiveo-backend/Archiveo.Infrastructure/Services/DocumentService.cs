@@ -116,6 +116,8 @@ public class DocumentService
         Guid currentUserId,
         bool isAdmin)
     {
+        ArgumentNullException.ThrowIfNull(request);
+
         var page = Math.Max(1, request.Page);
         var pageSize = Math.Clamp(request.PageSize > 0 ? request.PageSize : 20, 1, 100);
 
