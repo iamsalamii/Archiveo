@@ -32,12 +32,78 @@ public class DocumentService
         }
     }
 
-    // GET /api/documents
-    public async Task<List<DocumentDto>> GetAllAsync()
+    // =========================================================================
+    // CONTRÔLE D'ACCÈS AU PÉRIMÈTRE DE SERVICE
+    // =========================================================================
+
+    public async Task<(bool NotFound, bool IsAuthorized, Document? Document)> CheckDocumentAccessAsync(
+        Guid documentId,
+        Guid currentUserId,
+        bool isAdmin)
     {
+        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == documentId && d.IsActive);
+        if (doc == null)
+        {
+            return (NotFound: true, IsAuthorized: false, Document: null);
+        }
+
+        if (isAdmin)
+        {
+            return (NotFound: false, IsAuthorized: true, Document: doc);
+        }
+
+        // Récupération de l'identité et du ServiceId faisant autorité depuis la base PostgreSQL
+        var user = await _dbContext.Users.AsNoTracking()
+            .Where(u => u.Id == currentUserId && u.IsActive)
+            .Select(u => new { u.ServiceId })
+            .FirstOrDefaultAsync();
+
+        if (user == null || string.IsNullOrWhiteSpace(user.ServiceId))
+        {
+            return (NotFound: false, IsAuthorized: false, Document: null);
+        }
+
+        // Règle d'or : le document doit obligatoirement avoir un ServiceId et correspondre exactement à celui de l'utilisateur
+        if (string.IsNullOrWhiteSpace(doc.ServiceId) ||
+            !string.Equals(doc.ServiceId, user.ServiceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return (NotFound: false, IsAuthorized: false, Document: null);
+        }
+
+        return (NotFound: false, IsAuthorized: true, Document: doc);
+    }
+
+    // GET /api/documents
+    public Task<List<DocumentDto>> GetAllAsync()
+        => GetAllAsync(Guid.Empty, isAdmin: true);
+
+    public async Task<List<DocumentDto>> GetAllAsync(Guid currentUserId, bool isAdmin)
+    {
+        if (isAdmin)
+        {
+            var adminDocs = await _dbContext.Documents
+                .AsNoTracking()
+                .Where(d => d.IsActive)
+                .OrderByDescending(d => d.CreatedAt)
+                .ToListAsync();
+
+            return adminDocs.Select(MapToDto).ToList();
+        }
+
+        var user = await _dbContext.Users.AsNoTracking()
+            .Where(u => u.Id == currentUserId && u.IsActive)
+            .Select(u => new { u.ServiceId })
+            .FirstOrDefaultAsync();
+
+        if (user == null || string.IsNullOrWhiteSpace(user.ServiceId))
+        {
+            return new List<DocumentDto>();
+        }
+
+        // Exclusion stricte des documents hors périmètre directement en SQL
         var docs = await _dbContext.Documents
             .AsNoTracking()
-            .Where(d => d.IsActive)
+            .Where(d => d.IsActive && d.ServiceId == user.ServiceId)
             .OrderByDescending(d => d.CreatedAt)
             .ToListAsync();
 
@@ -54,9 +120,51 @@ public class DocumentService
         return doc == null ? null : MapToDto(doc);
     }
 
-    // POST /api/documents (avec fichier)
-    public async Task<DocumentDto> CreateAsync(CreateDocumentRequest request, IFormFile? file, Guid userId)
+    public async Task<(bool NotFound, bool IsAuthorized, DocumentDto? Document)> GetByIdSecuredAsync(
+        Guid id,
+        Guid currentUserId,
+        bool isAdmin)
     {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false, Document: null);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false, Document: null);
+
+        return (NotFound: false, IsAuthorized: true, Document: MapToDto(doc!));
+    }
+
+    // POST /api/documents (avec fichier)
+    public Task<DocumentDto> CreateAsync(CreateDocumentRequest request, IFormFile? file, Guid userId)
+        => CreateAsync(request, file, userId, isAdmin: false);
+
+    public async Task<DocumentDto> CreateAsync(CreateDocumentRequest request, IFormFile? file, Guid userId, bool isAdmin)
+    {
+        string targetServiceId;
+
+        if (isAdmin)
+        {
+            targetServiceId = !string.IsNullOrWhiteSpace(request.ServiceId) ? request.ServiceId : "GENERAL";
+        }
+        else
+        {
+            var user = await _dbContext.Users.AsNoTracking()
+                .Where(u => u.Id == userId && u.IsActive)
+                .Select(u => new { u.ServiceId })
+                .FirstOrDefaultAsync();
+
+            if (user == null || string.IsNullOrWhiteSpace(user.ServiceId))
+            {
+                throw new UnauthorizedAccessException("Votre compte n'est rattaché à aucun service actif.");
+            }
+
+            if (!string.IsNullOrWhiteSpace(request.ServiceId) &&
+                !string.Equals(request.ServiceId, user.ServiceId, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new UnauthorizedAccessException("Vous ne pouvez pas créer de document pour un autre service que le vôtre.");
+            }
+
+            targetServiceId = user.ServiceId;
+        }
+
         var doc = new Document
         {
             Id = Guid.NewGuid(),
@@ -66,7 +174,7 @@ public class DocumentService
             TypeId = request.TypeId,
             CategoryId = request.CategoryId,
             SubCategoryId = request.SubCategoryId,
-            ServiceId = request.ServiceId,
+            ServiceId = targetServiceId,
             StatusId = "BROUILLON",
             ConfidentialityId = request.ConfidentialityId,
             LanguageId = request.LanguageId,
@@ -92,18 +200,39 @@ public class DocumentService
     // PUT /api/documents/{id}
     public async Task<DocumentDto?> UpdateAsync(Guid id, UpdateDocumentRequest request, Guid userId)
     {
-        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
-        if (doc == null) return null;
+        var (notFound, isAuthorized, doc) = await UpdateSecuredAsync(id, request, userId, isAdmin: false);
+        return isAuthorized ? doc : null;
+    }
 
-        var previousVersionId = await SaveVersionSnapshotAsync(doc, userId);
-        doc.Version++;
+    public async Task<(bool NotFound, bool IsAuthorized, DocumentDto? Document)> UpdateSecuredAsync(
+        Guid id,
+        UpdateDocumentRequest request,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false, Document: null);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false, Document: null);
+
+        // Seul l'administrateur peut éventuellement transférer un document vers un autre service
+        if (!isAdmin && !string.IsNullOrWhiteSpace(request.ServiceId) &&
+            !string.Equals(request.ServiceId, doc!.ServiceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return (NotFound: false, IsAuthorized: false, Document: null);
+        }
+
+        var previousVersionId = await SaveVersionSnapshotAsync(doc!, currentUserId);
+        doc!.Version++;
         doc.ParentVersionId = previousVersionId;
         doc.Title = request.Title;
         doc.Description = request.Description;
         doc.TypeId = request.TypeId;
         doc.CategoryId = request.CategoryId;
         doc.SubCategoryId = request.SubCategoryId;
-        doc.ServiceId = request.ServiceId;
+        if (isAdmin && !string.IsNullOrWhiteSpace(request.ServiceId))
+        {
+            doc.ServiceId = request.ServiceId;
+        }
         doc.StatusId = request.StatusId;
         doc.ConfidentialityId = request.ConfidentialityId;
         doc.LanguageId = request.LanguageId;
@@ -111,27 +240,52 @@ public class DocumentService
         doc.RetentionYears = request.RetentionYears;
         doc.Tags = request.Tags;
         doc.Keywords = request.Keywords;
-        doc.UpdatedBy = userId;
+        doc.UpdatedBy = currentUserId;
         doc.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync();
-        return MapToDto(doc);
+        return (NotFound: false, IsAuthorized: true, Document: MapToDto(doc));
     }
 
     // DELETE /api/documents/{id}
     public async Task<bool> DeleteAsync(Guid id)
     {
-        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == id);
-        if (doc == null) return false;
+        var (notFound, isAuthorized) = await DeleteSecuredAsync(id, Guid.Empty, isAdmin: true);
+        return isAuthorized;
+    }
 
-        doc.IsActive = false;
+    public async Task<(bool NotFound, bool IsAuthorized)> DeleteSecuredAsync(
+        Guid id,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false);
+
+        doc!.IsActive = false;
+        doc.UpdatedBy = currentUserId;
+        doc.UpdatedAt = DateTime.UtcNow;
         await _dbContext.SaveChangesAsync();
-        return true;
+        return (NotFound: false, IsAuthorized: true);
     }
 
     public async Task<List<DocumentVersionDto>> GetVersionsAsync(Guid id)
     {
-        return await _dbContext.DocumentVersions
+        var (_, _, versions) = await GetVersionsSecuredAsync(id, Guid.Empty, isAdmin: true);
+        return versions ?? new List<DocumentVersionDto>();
+    }
+
+    public async Task<(bool NotFound, bool IsAuthorized, List<DocumentVersionDto>? Versions)> GetVersionsSecuredAsync(
+        Guid id,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false, Versions: null);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false, Versions: null);
+
+        var list = await _dbContext.DocumentVersions
             .Where(version => version.DocumentId == id)
             .OrderByDescending(version => version.Version)
             .Select(version => new DocumentVersionDto
@@ -147,35 +301,67 @@ public class DocumentService
                 CreatedAt = version.CreatedAt
             })
             .ToListAsync();
+
+        return (NotFound: false, IsAuthorized: true, Versions: list);
     }
 
     public async Task<DocumentDto?> SetArchivedAsync(Guid id, bool archived, Guid userId)
     {
-        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
-        if (doc == null) return null;
+        var (_, isAuthorized, doc) = await SetArchivedSecuredAsync(id, archived, userId, isAdmin: false);
+        return isAuthorized ? doc : null;
+    }
 
-        doc.IsArchived = archived;
+    public async Task<(bool NotFound, bool IsAuthorized, DocumentDto? Document)> SetArchivedSecuredAsync(
+        Guid id,
+        bool archived,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false, Document: null);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false, Document: null);
+
+        doc!.IsArchived = archived;
         if (archived) doc.StatusId = "ARCHIVE";
-        doc.UpdatedBy = userId;
+        else if (doc.StatusId == "ARCHIVE") doc.StatusId = "VALIDE";
+        doc.UpdatedBy = currentUserId;
         doc.UpdatedAt = DateTime.UtcNow;
+
         await _dbContext.SaveChangesAsync();
-        return MapToDto(doc);
+        return (NotFound: false, IsAuthorized: true, Document: MapToDto(doc));
     }
 
     public async Task<DocumentDto?> CreateVersionAsync(Guid id, UpdateDocumentRequest request, IFormFile? file, Guid userId)
     {
-        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
-        if (doc == null) return null;
+        var (_, isAuthorized, doc) = await CreateVersionSecuredAsync(id, request, file, userId, isAdmin: false);
+        return isAuthorized ? doc : null;
+    }
 
-        var previousVersionId = await SaveVersionSnapshotAsync(doc, userId);
-        doc.Version++;
+    public async Task<(bool NotFound, bool IsAuthorized, DocumentDto? Document)> CreateVersionSecuredAsync(
+        Guid id,
+        UpdateDocumentRequest request,
+        IFormFile? file,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false, Document: null);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false, Document: null);
+
+        if (!isAdmin && !string.IsNullOrWhiteSpace(request.ServiceId) &&
+            !string.Equals(request.ServiceId, doc!.ServiceId, StringComparison.OrdinalIgnoreCase))
+        {
+            return (NotFound: false, IsAuthorized: false, Document: null);
+        }
+
+        var previousVersionId = await SaveVersionSnapshotAsync(doc!, currentUserId);
+        doc!.Version++;
         doc.ParentVersionId = previousVersionId;
         doc.Title = request.Title;
         doc.Description = request.Description;
         doc.TypeId = request.TypeId;
         doc.CategoryId = request.CategoryId;
         doc.SubCategoryId = request.SubCategoryId;
-        doc.ServiceId = request.ServiceId;
         doc.StatusId = request.StatusId;
         doc.ConfidentialityId = request.ConfidentialityId;
         doc.LanguageId = request.LanguageId;
@@ -183,38 +369,62 @@ public class DocumentService
         doc.RetentionYears = request.RetentionYears;
         doc.Tags = request.Tags;
         doc.Keywords = request.Keywords;
-        doc.UpdatedBy = userId;
+        doc.UpdatedBy = currentUserId;
         doc.UpdatedAt = DateTime.UtcNow;
         if (file != null)
             await SaveFileAsync(doc, file);
 
         await _dbContext.SaveChangesAsync();
-        return MapToDto(doc);
+        return (NotFound: false, IsAuthorized: true, Document: MapToDto(doc));
     }
 
     // POST /api/documents/{id}/validate
     public async Task<DocumentDto?> ValidateAsync(Guid id, Guid userId)
     {
-        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
-        if (doc == null) return null;
+        var (_, isAuthorized, doc) = await ValidateSecuredAsync(id, userId, isAdmin: false);
+        return isAuthorized ? doc : null;
+    }
 
-        doc.Validated = true;
-        doc.ValidatedBy = userId;
+    public async Task<(bool NotFound, bool IsAuthorized, DocumentDto? Document)> ValidateSecuredAsync(
+        Guid id,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false, Document: null);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false, Document: null);
+
+        doc!.Validated = true;
+        doc.ValidatedBy = currentUserId;
         doc.ValidatedAt = DateTime.UtcNow;
         doc.StatusId = "VALIDE";
         doc.UpdatedAt = DateTime.UtcNow;
 
         await _dbContext.SaveChangesAsync();
-        return MapToDto(doc);
+        return (NotFound: false, IsAuthorized: true, Document: MapToDto(doc));
     }
 
     // GET /api/documents/{id}/download
     public async Task<(string FilePath, string FileName, string MimeType)?> GetFileAsync(Guid id)
     {
-        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == id && d.IsActive);
-        if (doc == null || doc.FilePath == null) return null;
+        var (notFound, isAuthorized, filePath, fileName, mimeType) = await GetFileSecuredAsync(id, Guid.Empty, isAdmin: true);
+        if (notFound || !isAuthorized || filePath == null) return null;
+        return (filePath, fileName ?? "document", mimeType ?? "application/octet-stream");
+    }
 
-        return (doc.FilePath, doc.FileName ?? "document", doc.MimeType ?? "application/octet-stream");
+    public async Task<(bool NotFound, bool IsAuthorized, string? FilePath, string? FileName, string? MimeType)> GetFileSecuredAsync(
+        Guid id,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var (notFound, isAuthorized, doc) = await CheckDocumentAccessAsync(id, currentUserId, isAdmin);
+        if (notFound) return (NotFound: true, IsAuthorized: false, null, null, null);
+        if (!isAuthorized) return (NotFound: false, IsAuthorized: false, null, null, null);
+
+        if (doc!.FilePath == null)
+            return (NotFound: true, IsAuthorized: true, null, null, null);
+
+        return (NotFound: false, IsAuthorized: true, doc.FilePath, doc.FileName ?? "document", doc.MimeType ?? "application/octet-stream");
     }
 
     // Helpers priv�s

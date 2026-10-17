@@ -24,12 +24,21 @@ public class DocumentsController : ControllerBase
     private Guid GetUserId() =>
         Guid.Parse(User.FindFirstValue(ClaimTypes.NameIdentifier)!);
 
+    private bool IsAdmin() =>
+        User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+
+    private IActionResult ForbidDocument() =>
+        StatusCode(StatusCodes.Status403Forbidden, new { message = "Accès refusé. Vous n'avez pas l'autorisation d'accéder à ce document." });
+
+    private IActionResult NotFoundDocument() =>
+        NotFound(new { message = "Document introuvable." });
+
     // GET /api/documents
     [HttpGet]
     [Permission("documents.read")]
     public async Task<IActionResult> GetAll()
     {
-        var docs = await _documentService.GetAllAsync();
+        var docs = await _documentService.GetAllAsync(GetUserId(), IsAdmin());
         return Ok(docs);
     }
 
@@ -38,8 +47,9 @@ public class DocumentsController : ControllerBase
     [Permission("documents.read")]
     public async Task<IActionResult> GetById(Guid id)
     {
-        var doc = await _documentService.GetByIdAsync(id);
-        if (doc == null) return NotFound();
+        var (notFound, isAuthorized, doc) = await _documentService.GetByIdSecuredAsync(id, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
         return Ok(doc);
     }
 
@@ -50,8 +60,12 @@ public class DocumentsController : ControllerBase
     {
         try
         {
-            var doc = await _documentService.CreateAsync(request, file, GetUserId());
+            var doc = await _documentService.CreateAsync(request, file, GetUserId(), IsAdmin());
             return CreatedAtAction(nameof(GetById), new { id = doc.Id }, doc);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -64,8 +78,9 @@ public class DocumentsController : ControllerBase
     [Permission("documents.update")]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateDocumentRequest request)
     {
-        var doc = await _documentService.UpdateAsync(id, request, GetUserId());
-        if (doc == null) return NotFound();
+        var (notFound, isAuthorized, doc) = await _documentService.UpdateSecuredAsync(id, request, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
         return Ok(doc);
     }
 
@@ -74,8 +89,9 @@ public class DocumentsController : ControllerBase
     [Permission("documents.delete")]
     public async Task<IActionResult> Delete(Guid id)
     {
-        var success = await _documentService.DeleteAsync(id);
-        if (!success) return NotFound();
+        var (notFound, isAuthorized) = await _documentService.DeleteSecuredAsync(id, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
         return NoContent();
     }
 
@@ -84,8 +100,9 @@ public class DocumentsController : ControllerBase
     [Permission("documents.validate")]
     public async Task<IActionResult> Validate(Guid id)
     {
-        var doc = await _documentService.ValidateAsync(id, GetUserId());
-        if (doc == null) return NotFound();
+        var (notFound, isAuthorized, doc) = await _documentService.ValidateSecuredAsync(id, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
         return Ok(doc);
     }
 
@@ -94,37 +111,44 @@ public class DocumentsController : ControllerBase
     [Permission("documents.download")]
     public async Task<IActionResult> Download(Guid id)
     {
-        var file = await _documentService.GetFileAsync(id);
-        if (file == null) return NotFound();
+        var (notFound, isAuthorized, filePath, fileName, mimeType) = await _documentService.GetFileSecuredAsync(id, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
 
-        var (filePath, fileName, mimeType) = file.Value;
-        if (!System.IO.File.Exists(filePath)) return NotFound();
+        if (filePath == null || !System.IO.File.Exists(filePath)) return NotFoundDocument();
 
         var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
-        return File(fileBytes, mimeType, fileName);
+        return File(fileBytes, mimeType ?? "application/octet-stream", fileName ?? "document");
     }
 
     [HttpGet("{id:guid}/versions")]
     [Permission("documents.read")]
     public async Task<IActionResult> GetVersions(Guid id)
     {
-        return Ok(await _documentService.GetVersionsAsync(id));
+        var (notFound, isAuthorized, versions) = await _documentService.GetVersionsSecuredAsync(id, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
+        return Ok(versions);
     }
 
     [HttpPost("{id:guid}/archive")]
     [Permission("documents.update")]
     public async Task<IActionResult> Archive(Guid id)
     {
-        var document = await _documentService.SetArchivedAsync(id, true, GetUserId());
-        return document == null ? NotFound() : Ok(document);
+        var (notFound, isAuthorized, doc) = await _documentService.SetArchivedSecuredAsync(id, true, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
+        return Ok(doc);
     }
 
     [HttpPost("{id:guid}/unarchive")]
     [Permission("documents.update")]
     public async Task<IActionResult> Unarchive(Guid id)
     {
-        var document = await _documentService.SetArchivedAsync(id, false, GetUserId());
-        return document == null ? NotFound() : Ok(document);
+        var (notFound, isAuthorized, doc) = await _documentService.SetArchivedSecuredAsync(id, false, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
+        return Ok(doc);
     }
 
     [HttpPost("{id:guid}/versions")]
@@ -134,7 +158,9 @@ public class DocumentsController : ControllerBase
         [FromForm] UpdateDocumentRequest request,
         IFormFile? file)
     {
-        var document = await _documentService.CreateVersionAsync(id, request, file, GetUserId());
-        return document == null ? NotFound() : Ok(document);
+        var (notFound, isAuthorized, doc) = await _documentService.CreateVersionSecuredAsync(id, request, file, GetUserId(), IsAdmin());
+        if (notFound) return NotFoundDocument();
+        if (!isAuthorized) return ForbidDocument();
+        return Ok(doc);
     }
 }
