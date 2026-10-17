@@ -105,6 +105,7 @@ public static class PermissionSeeder
             new Permission { Id = Guid.NewGuid(), Code = "correspondences.create", Name = "Creer un courrier", Module = "correspondences", Order = 1007 },
             new Permission { Id = Guid.NewGuid(), Code = "correspondences.update", Name = "Modifier un courrier", Module = "correspondences", Order = 1008 },
             new Permission { Id = Guid.NewGuid(), Code = "correspondences.delete", Name = "Supprimer un courrier", Module = "correspondences", Order = 1009 },
+            new Permission { Id = Guid.NewGuid(), Code = "signatures.read", Name = "Consulter toutes les signatures", Module = "signatures", Order = 1010 },
         };
 
         var existingCodes = await dbContext.Permissions

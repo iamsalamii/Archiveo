@@ -52,6 +52,74 @@ public class SignatureService
         return list.Select(MapToDto).ToList();
     }
 
+    public async Task<bool> HasPermissionAsync(Guid userId, string permissionCode)
+    {
+        return await (
+            from userRole in _dbContext.UserRoles
+            join rolePermission in _dbContext.RolePermissions on userRole.RoleId equals rolePermission.RoleId
+            join permission in _dbContext.Permissions on rolePermission.PermissionId equals permission.Id
+            where userRole.UserId == userId && permission.Code == permissionCode
+            select permission.Id
+        ).AnyAsync();
+    }
+
+    public async Task<(bool NotFound, bool IsAuthorized, DocumentSignatureDto? Signature)> GetSignatureByIdSecuredAsync(
+        Guid id,
+        Guid currentUserId,
+        string currentUserEmail,
+        bool isAdmin)
+    {
+        var s = await _dbContext.DocumentSignatures.FindAsync(id);
+        if (s == null)
+        {
+            return (NotFound: true, IsAuthorized: false, Signature: null);
+        }
+
+        if (isAdmin)
+        {
+            return (NotFound: false, IsAuthorized: true, Signature: MapToDto(s));
+        }
+
+        var emailLower = currentUserEmail.ToLower();
+        var isSigner = (s.SignerUserId.HasValue && s.SignerUserId.Value == currentUserId)
+            || (!string.IsNullOrEmpty(s.SignerEmail) && string.Equals(s.SignerEmail, emailLower, StringComparison.OrdinalIgnoreCase));
+        var isRequester = s.RequestedByUserId.HasValue && s.RequestedByUserId.Value == currentUserId;
+
+        var hasSignaturesRead = await HasPermissionAsync(currentUserId, "signatures.read");
+
+        if (!isSigner && !isRequester && !hasSignaturesRead)
+        {
+            return (NotFound: false, IsAuthorized: false, Signature: null);
+        }
+
+        return (NotFound: false, IsAuthorized: true, Signature: MapToDto(s));
+    }
+
+    public async Task<(bool Exists, SignaturePublicProofDto? Proof)> VerifySignaturePublicAsync(Guid id)
+    {
+        var s = await _dbContext.DocumentSignatures.FindAsync(id);
+        if (s == null || s.Status != "signed")
+        {
+            return (Exists: false, Proof: null);
+        }
+
+        var proof = new SignaturePublicProofDto
+        {
+            SignatureId = s.Id,
+            CertificateNumber = s.CertificateNumber ?? $"CERT-{s.Id.ToString()[..8].ToUpperInvariant()}",
+            DocumentReference = s.DocumentReference,
+            DocumentTitle = s.DocumentTitle,
+            Status = s.Status,
+            SignedAt = s.SignedAt,
+            Sha256Hash = s.Sha256Hash ?? "Non calculé",
+            Algorithm = "SHA-256 (eIDAS Timestamped)",
+            Issuer = "Archivéo Electronic Parapheur Trust Service",
+            IsAuthentic = true
+        };
+
+        return (Exists: true, Proof: proof);
+    }
+
     public async Task<List<DocumentSignatureDto>> GetByDocumentIdAsync(Guid documentId)
     {
         var list = await _dbContext.DocumentSignatures
@@ -62,14 +130,115 @@ public class SignatureService
         return list.Select(MapToDto).ToList();
     }
 
-    public async Task<DocumentSignatureDto> RequestSignatureAsync(CreateSignatureRequest request, Guid requestedByUserId, string requestedByUserName)
+    public async Task<(bool DocumentNotFound, bool IsAuthorized, List<DocumentSignatureDto>? Signatures)> GetByDocumentIdSecuredAsync(
+        Guid documentId,
+        Guid currentUserId,
+        string currentUserEmail,
+        bool isAdmin)
     {
-        // 1. Check document
-        var doc = await _dbContext.Documents.FindAsync(request.DocumentId);
-        var docTitle = doc?.Title ?? request.DocumentTitle;
-        var docRef = doc?.Reference ?? request.DocumentReference ?? "DOC-SIG";
+        var doc = await _dbContext.Documents.AsNoTracking().FirstOrDefaultAsync(d => d.Id == documentId && d.IsActive);
+        if (doc == null)
+        {
+            return (DocumentNotFound: true, IsAuthorized: false, Signatures: null);
+        }
 
-        // 2. Generate security PIN
+        if (isAdmin)
+        {
+            var adminList = await _dbContext.DocumentSignatures
+                .Where(s => s.DocumentId == documentId)
+                .OrderByDescending(s => s.RequestedAt)
+                .ToListAsync();
+            return (DocumentNotFound: false, IsAuthorized: true, Signatures: adminList.Select(MapToDto).ToList());
+        }
+
+        // 1. L'utilisateur est-il le créateur du document ?
+        var isCreator = doc.CreatedBy == currentUserId;
+
+        // 2. L'utilisateur est-il désigné comme signataire ou demandeur sur ce document ?
+        var emailLower = currentUserEmail.ToLower();
+        var isSignerOrRequester = await _dbContext.DocumentSignatures.AnyAsync(s =>
+            s.DocumentId == documentId &&
+            (s.RequestedByUserId == currentUserId ||
+             s.SignerUserId == currentUserId ||
+             (!string.IsNullOrEmpty(s.SignerEmail) && s.SignerEmail.ToLower() == emailLower)));
+
+        // 3. L'utilisateur possède-t-il la permission globale signatures.read ?
+        var hasSignaturesRead = await (
+            from userRole in _dbContext.UserRoles
+            join rolePermission in _dbContext.RolePermissions on userRole.RoleId equals rolePermission.RoleId
+            join permission in _dbContext.Permissions on rolePermission.PermissionId equals permission.Id
+            where userRole.UserId == currentUserId && permission.Code == "signatures.read"
+            select permission.Id
+        ).AnyAsync();
+
+        // 4. Contrôle du périmètre organisationnel / service si l'utilisateur a documents.read
+        var hasDocRead = await (
+            from userRole in _dbContext.UserRoles
+            join rolePermission in _dbContext.RolePermissions on userRole.RoleId equals rolePermission.RoleId
+            join permission in _dbContext.Permissions on rolePermission.PermissionId equals permission.Id
+            where userRole.UserId == currentUserId && permission.Code == "documents.read"
+            select permission.Id
+        ).AnyAsync();
+
+        bool isWithinServicePerimeter = false;
+        if (hasDocRead)
+        {
+            var user = await _dbContext.Users.AsNoTracking().FirstOrDefaultAsync(u => u.Id == currentUserId);
+            isWithinServicePerimeter = string.IsNullOrEmpty(doc.ServiceId)
+                || string.IsNullOrEmpty(user?.ServiceId)
+                || string.Equals(doc.ServiceId, user.ServiceId, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var isAuthorized = isCreator || isSignerOrRequester || hasSignaturesRead || isWithinServicePerimeter;
+        if (!isAuthorized)
+        {
+            return (DocumentNotFound: false, IsAuthorized: false, Signatures: null);
+        }
+
+        var list = await _dbContext.DocumentSignatures
+            .Where(s => s.DocumentId == documentId)
+            .OrderByDescending(s => s.RequestedAt)
+            .ToListAsync();
+
+        return (DocumentNotFound: false, IsAuthorized: true, Signatures: list.Select(MapToDto).ToList());
+    }
+
+    public async Task<DocumentSignatureDto> RequestSignatureAsync(
+        CreateSignatureRequest request,
+        Guid requestedByUserId,
+        string requestedByUserName,
+        string requestedByUserEmail = "",
+        bool isAdmin = false)
+    {
+        // 1. Check document existence
+        var doc = await _dbContext.Documents.FirstOrDefaultAsync(d => d.Id == request.DocumentId && d.IsActive);
+        if (doc == null)
+        {
+            throw new KeyNotFoundException("Le document ciblé est introuvable ou inactif.");
+        }
+
+        // 2. Vérification des droits pour initier une signature sur ce document
+        if (!isAdmin && doc.CreatedBy != requestedByUserId)
+        {
+            var hasPermission = await (
+                from userRole in _dbContext.UserRoles
+                join rolePermission in _dbContext.RolePermissions on userRole.RoleId equals rolePermission.RoleId
+                join permission in _dbContext.Permissions on rolePermission.PermissionId equals permission.Id
+                where userRole.UserId == requestedByUserId &&
+                      (permission.Code == "documents.update" || permission.Code == "signatures.read")
+                select permission.Id
+            ).AnyAsync();
+
+            if (!hasPermission)
+            {
+                throw new UnauthorizedAccessException("Contrôle de sécurité : Vous n'avez pas l'autorisation d'initier une signature sur ce document.");
+            }
+        }
+
+        var docTitle = doc.Title;
+        var docRef = doc.Reference;
+
+        // 3. Generate security PIN
         var pin = RandomNumberGenerator.GetInt32(100000, 999999).ToString();
 
         var signature = new DocumentSignature
@@ -214,6 +383,55 @@ public class SignatureService
         var signature = await _dbContext.DocumentSignatures.FindAsync(id);
         if (signature == null || signature.Status != "signed")
             throw new KeyNotFoundException("Certificat introuvable ou document non signé.");
+
+        return new SignatureCertificateDto
+        {
+            SignatureId = signature.Id,
+            CertificateNumber = signature.CertificateNumber ?? $"CERT-{signature.Id.ToString()[..8]}",
+            DocumentTitle = signature.DocumentTitle,
+            DocumentReference = signature.DocumentReference,
+            SignerName = signature.SignerName,
+            SignerEmail = signature.SignerEmail,
+            SignerPhone = signature.SignerPhone,
+            SignedAt = signature.SignedAt ?? DateTime.UtcNow,
+            Sha256Hash = signature.Sha256Hash ?? "Non calculé",
+            IpAddress = signature.SignerIpAddress ?? "127.0.0.1",
+            Algorithm = "SHA-256 Cryptographic Timestamping (eIDAS standard)",
+            Status = "VERIFIED_AUTHENTIC",
+            Issuer = "Archivéo Electronic Parapheur Trust Service"
+        };
+    }
+
+    public async Task<SignatureCertificateDto> GetCertificateSecuredAsync(
+        Guid id,
+        Guid currentUserId,
+        string currentUserEmail,
+        bool isAdmin)
+    {
+        var signature = await _dbContext.DocumentSignatures.FindAsync(id);
+        if (signature == null || signature.Status != "signed")
+            throw new KeyNotFoundException("Certificat introuvable ou document non encore signé.");
+
+        if (!isAdmin)
+        {
+            var emailLower = currentUserEmail.ToLower();
+            var isSigner = (signature.SignerUserId.HasValue && signature.SignerUserId.Value == currentUserId)
+                || (!string.IsNullOrEmpty(signature.SignerEmail) && string.Equals(signature.SignerEmail, emailLower, StringComparison.OrdinalIgnoreCase));
+            var isRequester = signature.RequestedByUserId.HasValue && signature.RequestedByUserId.Value == currentUserId;
+
+            var hasSignaturesRead = await (
+                from userRole in _dbContext.UserRoles
+                join rolePermission in _dbContext.RolePermissions on userRole.RoleId equals rolePermission.RoleId
+                join permission in _dbContext.Permissions on rolePermission.PermissionId equals permission.Id
+                where userRole.UserId == currentUserId && permission.Code == "signatures.read"
+                select permission.Id
+            ).AnyAsync();
+
+            if (!isSigner && !isRequester && !hasSignaturesRead)
+            {
+                throw new UnauthorizedAccessException("Contrôle de sécurité : Vous n'êtes pas autorisé(e) à consulter ce certificat de signature.");
+            }
+        }
 
         return new SignatureCertificateDto
         {

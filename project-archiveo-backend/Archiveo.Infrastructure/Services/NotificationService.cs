@@ -54,17 +54,21 @@ public class NotificationService
 
         var dto = MapToDto(notification);
 
-        // Push SignalR
-        if (request.UserId.HasValue)
+        // Push SignalR (si le hub est actif)
+        if (_hubContext != null)
         {
-            await _hubContext.Clients
-                .Group(request.UserId.Value.ToString())
-                .SendAsync("ReceiveNotification", dto);
+            if (request.UserId.HasValue)
+            {
+                await _hubContext.Clients
+                    .Group(request.UserId.Value.ToString())
+                    .SendAsync("ReceiveNotification", dto);
+            }
+            else
+            {
+                await _hubContext.Clients.All.SendAsync("ReceiveNotification", dto);
+            }
         }
-        else
-        {
-            await _hubContext.Clients.All.SendAsync("ReceiveNotification", dto);
-        }
+
 
         return dto;
     }

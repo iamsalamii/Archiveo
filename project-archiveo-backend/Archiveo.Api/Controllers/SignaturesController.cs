@@ -1,3 +1,4 @@
+using Archiveo.Api.Authorization;
 using Archiveo.Application.DTOs.Signatures;
 using Archiveo.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -47,18 +48,83 @@ public class SignaturesController : ControllerBase
 
     /// <summary>Toutes les signatures (superviseur / parapheur global)</summary>
     [HttpGet]
+    [Permission("signatures.read")]
     public async Task<IActionResult> GetAllSignatures()
     {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { message = "Authentification requise." });
+        }
+
+        var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+        var hasPermission = isAdmin || await _signatureService.HasPermissionAsync(userId, "signatures.read");
+        if (!hasPermission)
+        {
+            return StatusCode(403, new { message = "Accès refusé : la permission 'signatures.read' est requise pour accéder au registre global des signatures." });
+        }
+
         var list = await _signatureService.GetAllSignaturesAsync();
         return Ok(list);
     }
 
-    /// <summary>Signatures associées à un document précis</summary>
+    /// <summary>Détail d'une signature avec contrôle de confidentialité</summary>
+    [HttpGet("{id:guid}")]
+    public async Task<IActionResult> GetSignatureById(Guid id)
+    {
+        var userIdClaim = User.FindFirstValue(ClaimTypes.NameIdentifier);
+        if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+        {
+            return Unauthorized(new { message = "Authentification requise." });
+        }
+
+        var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+        var result = await _signatureService.GetSignatureByIdSecuredAsync(id, userId, GetUserEmail(), isAdmin);
+        if (result.NotFound)
+        {
+            return NotFound(new { message = "Demande de signature introuvable." });
+        }
+
+        if (!result.IsAuthorized)
+        {
+            return StatusCode(403, new { message = "Accès refusé : vous n'avez pas l'autorisation de consulter cette signature." });
+        }
+
+        return Ok(result.Signature);
+    }
+
+    /// <summary>Vérification publique de l'authenticité d'une signature / scellement électronique (standard eIDAS)</summary>
+    [HttpGet("{id:guid}/verify")]
+    [AllowAnonymous]
+    public async Task<IActionResult> VerifySignaturePublic(Guid id)
+    {
+        var verification = await _signatureService.VerifySignaturePublicAsync(id);
+        if (!verification.Exists)
+        {
+            return NotFound(new { message = "Aucun scellement électronique authentique correspondant à cet identifiant." });
+        }
+
+        return Ok(verification.Proof);
+    }
+
+
+    /// <summary>Signatures associées à un document précis (avec vérification du périmètre et de l'accès document)</summary>
     [HttpGet("document/{documentId:guid}")]
     public async Task<IActionResult> GetSignaturesByDocument(Guid documentId)
     {
-        var list = await _signatureService.GetByDocumentIdAsync(documentId);
-        return Ok(list);
+        var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+        var result = await _signatureService.GetByDocumentIdSecuredAsync(documentId, GetUserId(), GetUserEmail(), isAdmin);
+        if (result.DocumentNotFound)
+        {
+            return NotFound(new { message = "Document introuvable ou inactif." });
+        }
+
+        if (!result.IsAuthorized)
+        {
+            return StatusCode(403, new { message = "Accès refusé : vous n'avez pas l'autorisation de consulter les signatures de ce document." });
+        }
+
+        return Ok(result.Signatures);
     }
 
     /// <summary>Initier une demande de signature</summary>
@@ -67,8 +133,17 @@ public class SignaturesController : ControllerBase
     {
         try
         {
-            var result = await _signatureService.RequestSignatureAsync(request, GetUserId(), GetUserName());
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+            var result = await _signatureService.RequestSignatureAsync(request, GetUserId(), GetUserName(), GetUserEmail(), isAdmin);
             return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (Exception ex)
         {
@@ -86,6 +161,10 @@ public class SignaturesController : ControllerBase
             var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
             var result = await _signatureService.SignAsync(id, request, ip, GetUserId(), GetUserEmail(), isAdmin);
             return Ok(result);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
         }
         catch (UnauthorizedAccessException ex)
         {
@@ -107,6 +186,10 @@ public class SignaturesController : ControllerBase
             var result = await _signatureService.RejectAsync(id, request, GetUserId(), GetUserEmail(), isAdmin);
             return Ok(result);
         }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
         catch (UnauthorizedAccessException ex)
         {
             return StatusCode(403, new { message = ex.Message });
@@ -123,12 +206,21 @@ public class SignaturesController : ControllerBase
     {
         try
         {
-            var certificate = await _signatureService.GetCertificateAsync(id);
+            var isAdmin = User.IsInRole("Admin") || User.HasClaim(ClaimTypes.Role, "Admin");
+            var certificate = await _signatureService.GetCertificateSecuredAsync(id, GetUserId(), GetUserEmail(), isAdmin);
             return Ok(certificate);
+        }
+        catch (KeyNotFoundException ex)
+        {
+            return NotFound(new { message = ex.Message });
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(403, new { message = ex.Message });
         }
         catch (Exception ex)
         {
-            return NotFound(new { message = ex.Message });
+            return BadRequest(new { message = ex.Message });
         }
     }
 }

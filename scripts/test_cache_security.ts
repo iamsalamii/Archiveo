@@ -1,4 +1,4 @@
-import { apiClient, tokenService, invalidateApiCache } from '../project-archiveo-frontend/services/api-client.ts';
+import { apiClient, tokenService, invalidateApiCache, getCachePartition } from '../project-archiveo-frontend/services/api-client.ts';
 
 // Mock environnement navigateur
 class MockStorage {
@@ -84,7 +84,7 @@ async function main() {
     }
   });
 
-  // 2. Remplacement du jeton pendant une requête en cours
+  // 2. Remplacement du jeton pendant une requête en cours (rejet immédiat de l'ancienne promesse)
   await runTest('2. Remplacement du jeton pendant une requête en vol', async () => {
     let inflightResolve: any;
     (globalThis as any).fetch = async (url: string, opts: any) => {
@@ -106,9 +106,20 @@ async function main() {
     // Pendant que la requête est en vol, le token est remplacé par B
     tokenService.set('token-B-full-jwt-long-signature-22222222');
 
-    // Maintenant la requête de A se termine
-    inflightResolve();
-    const resA = await promiseA;
+    // Maintenant la requête de A se termine : la promesse retournée à A DOIT être rejetée
+    let promiseARejected = false;
+    try {
+      inflightResolve();
+      await promiseA;
+    } catch (err: any) {
+      if (err.name === 'SessionAbortedError' || err.isSessionAborted) {
+        promiseARejected = true;
+      }
+    }
+
+    if (!promiseARejected) {
+      throw new Error("FAILLE : La promesse appelante de la session A n'a pas été rejetée lors du changement de session !");
+    }
 
     // Maintenant B demande /api/sensitive
     (globalThis as any).fetch = async () => ({
@@ -141,8 +152,19 @@ async function main() {
     tokenService.remove();
 
     // La réponse du serveur arrive enfin
-    delayedResolve();
-    await reqA;
+    let reqARejected = false;
+    try {
+      delayedResolve();
+      await reqA;
+    } catch (err: any) {
+      if (err.name === 'SessionAbortedError' || err.isSessionAborted) {
+        reqARejected = true;
+      }
+    }
+
+    if (!reqARejected) {
+      throw new Error("FAILLE : La promesse appelante de A n'a pas été rejetée lors de la déconnexion !");
+    }
 
     // Vérifier si la réponse a été réinjectée dans le cache après la déconnexion
     let anonFetchCount = 0;
@@ -186,8 +208,19 @@ async function main() {
     tokenService.set(token2);
 
     // La réponse de User 1 arrive enfin
-    slowResolve();
-    await promise1;
+    let promise1Rejected = false;
+    try {
+      slowResolve();
+      await promise1;
+    } catch (err: any) {
+      if (err.name === 'SessionAbortedError' || err.isSessionAborted) {
+        promise1Rejected = true;
+      }
+    }
+
+    if (!promise1Rejected) {
+      throw new Error("FAILLE : La promesse de User 1 n'a pas été rejetée lors de la connexion de User 2 !");
+    }
 
     // User 2 interroge son compte
     (globalThis as any).fetch = async () => ({
@@ -353,6 +386,231 @@ async function main() {
       Date.now = realDateNow;
     }
   });
+
+  // 10. Annulation réseau avec AbortController lors de la déconnexion
+  await runTest('10. Annulation réseau effective (AbortController.signal.aborted) sur déconnexion', async () => {
+    let capturedSignal: AbortSignal | null = null;
+    (globalThis as any).fetch = async (url: string, opts: any) => {
+      capturedSignal = opts?.signal ?? null;
+      return new Promise((resolve, reject) => {
+        if (capturedSignal) {
+          capturedSignal.addEventListener('abort', () => {
+            const err = new Error('The operation was aborted');
+            err.name = 'AbortError';
+            reject(err);
+          });
+        }
+      });
+    };
+
+    tokenService.set('token-abort-network-test');
+    const reqPromise = apiClient.get('/api/slow-resource');
+
+    // Déconnexion pendant que la requête réseau attend
+    tokenService.remove();
+
+    if (!capturedSignal) {
+      throw new Error("FAILLE : Aucun AbortSignal n'a été transmis au fetch sous-jacent !");
+    }
+    if (!(capturedSignal as AbortSignal).aborted) {
+      throw new Error("FAILLE : Le signal réseau AbortSignal n'est pas passé à l'état aborted après la déconnexion !");
+    }
+
+    let rejected = false;
+    try {
+      await reqPromise;
+    } catch (err: any) {
+      if (err.name === 'SessionAbortedError' || err.isSessionAborted) {
+        rejected = true;
+      }
+    }
+    if (!rejected) {
+      throw new Error("FAILLE : La requête n'a pas levé SessionAbortedError !");
+    }
+  });
+
+  // 11. Déduplication multi-appelants et annulation isolée (un abonné annule, l'autre reçoit sa réponse)
+  await runTest('11. Déduplication multi-appelants : annulation isolée sans interrompre les autres', async () => {
+    let networkCalls = 0;
+    let completeRequest: any;
+    (globalThis as any).fetch = async (url: string, opts: any) => {
+      networkCalls++;
+      return new Promise((resolve) => {
+        completeRequest = () => resolve({ ok: true, status: 200, json: async () => ({ sharedData: 'OK_FOR_ALL' }) });
+      });
+    };
+
+    tokenService.set('token-shared-dedup-test');
+
+    const ac1 = new AbortController();
+    const ac2 = new AbortController();
+
+    const req1 = apiClient.get<any>('/api/shared', { signal: ac1.signal });
+    const req2 = apiClient.get<any>('/api/shared', { signal: ac2.signal });
+
+    if (networkCalls !== 1) {
+      throw new Error(`Déduplication échouée : ${networkCalls} appels réseau au lieu de 1`);
+    }
+
+    // Le premier abonné annule sa demande
+    ac1.abort();
+
+    let req1Aborted = false;
+    try {
+      await req1;
+    } catch (err: any) {
+      if (err.name === 'AbortError' || err.message?.includes('Aborted') || err.name === 'SessionAbortedError') {
+        req1Aborted = true;
+      }
+    }
+    if (!req1Aborted) {
+      throw new Error("L'appelant 1 aurait dû recevoir une erreur d'annulation");
+    }
+
+    // La requête réseau se termine pour l'appelant 2 qui est resté abonné
+    completeRequest();
+    const res2 = await req2;
+    if (res2.sharedData !== 'OK_FOR_ALL') {
+      throw new Error(`L'appelant 2 n'a pas reçu ses données partagées! Reçu: ${JSON.stringify(res2)}`);
+    }
+  });
+
+  // 12. Partition de cache stable par claim 'sub' JWT lors du renouvellement de jeton
+  await runTest('12. Stabilité de partition par claim JWT sub lors du renouvellement de jeton', async () => {
+    let serverCalls = 0;
+    (globalThis as any).fetch = async () => {
+      serverCalls++;
+      return { ok: true, status: 200, json: async () => ({ profile: 'Charlie', balance: 500 }) };
+    };
+
+    // Helper pour créer un faux JWT avec un sub donné
+    const createFakeJwt = (sub: string, salt: string) => {
+      const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
+      const payload = Buffer.from(JSON.stringify({ sub, nameid: sub, salt })).toString('base64');
+      return `${header}.${payload}.signature_${salt}`;
+    };
+
+    const token1 = createFakeJwt('user-uuid-1234', 'salt1');
+    const token2 = createFakeJwt('user-uuid-1234', 'salt2'); // Même utilisateur (sub), jeton renouvelé !
+    const tokenOther = createFakeJwt('user-uuid-9999', 'salt3'); // Utilisateur différent
+
+    tokenService.set(token1);
+    const read1 = await apiClient.get<any>('/api/me');
+    if (read1.profile !== 'Charlie' || serverCalls !== 1) {
+      throw new Error('Échec première lecture Charlie');
+    }
+
+    // Même utilisateur renouvèle son jeton : la partition reste 'user:user-uuid-1234'
+    // Après un refresh token légitime, l'accès au même endpoint appelle le cache ou le serveur sans collision
+    tokenService.set(token2);
+    (globalThis as any).fetch = async () => {
+      serverCalls++;
+      return { ok: true, status: 200, json: async () => ({ profile: 'Charlie', balance: 500 }) };
+    };
+    const read2 = await apiClient.get<any>('/api/me');
+    if (read2.profile !== 'Charlie') {
+      throw new Error('Échec lecture après refresh token');
+    }
+
+    // Basculement sur un utilisateur différent
+    tokenService.set(tokenOther);
+    (globalThis as any).fetch = async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({ profile: 'David', balance: 0 }),
+    });
+    const readOther = await apiClient.get<any>('/api/me');
+    if (readOther.profile !== 'David') {
+      throw new Error(`VIOLATION DE SÉCURITÉ : David a reçu ${readOther.profile} au lieu de son profil !`);
+    }
+  });
+
+  // 13. Robustesse face aux JWT invalides, tronqués ou corrompus (fallback SHA-256 déterministe)
+  await runTest('13. Robustesse face aux JWT invalides, corrompus ou opaques (fallback SHA-256)', async () => {
+    // Cas 1 : Token opaque simple (sans points)
+    const partOpaque = getCachePartition('opaque_api_key_system_9988');
+    if (!partOpaque.startsWith('sha256:')) {
+      throw new Error(`Attendu préfixe sha256:, reçu ${partOpaque}`);
+    }
+
+    // Cas 2 : JWT malformé (2 segments au lieu de 3)
+    const partTwoParts = getCachePartition('header.payload');
+    if (!partTwoParts.startsWith('sha256:')) {
+      throw new Error(`Attendu préfixe sha256: pour JWT incomplet, reçu ${partTwoParts}`);
+    }
+
+    // Cas 3 : Base64 corrompu dans le payload
+    const partBadBase64 = getCachePartition('eyJhbGciOiJIUzI1NiJ9.!!!NOT_BASE64!!!.sig');
+    if (!partBadBase64.startsWith('sha256:')) {
+      throw new Error(`Attendu préfixe sha256: pour base64 invalide, reçu ${partBadBase64}`);
+    }
+
+    // Cas 4 : JSON non objet dans le payload
+    const badJsonPayload = Buffer.from('"just_a_string_not_object"').toString('base64');
+    const partBadJson = getCachePartition(`header.${badJsonPayload}.sig`);
+    if (!partBadJson.startsWith('sha256:')) {
+      throw new Error(`Attendu préfixe sha256: pour JSON non-objet, reçu ${partBadJson}`);
+    }
+
+    // Cas 5 : Déterminisme et unicité
+    const part1 = getCachePartition('secret_token_alpha');
+    const part2 = getCachePartition('secret_token_alpha');
+    const part3 = getCachePartition('secret_token_beta');
+    if (part1 !== part2) throw new Error('Le hachage SHA-256 doit être déterministe');
+    if (part1 === part3) throw new Error('Deux tokens distincts ne doivent pas entrer en collision');
+  });
+
+  // 14. Révocation/Modification des permissions : purge étanche du cache pour empêcher la réutilisation de données obsolètes
+  await runTest('14. Permissions modifiées : invalidation étanche et non-réutilisation de données obsolètes', async () => {
+    let callCount = 0;
+    // Helper pour créer un JWT
+    const makeJwtWithRole = (userId: string, role: string, salt: string) => {
+      const h = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64');
+      const p = Buffer.from(JSON.stringify({ sub: userId, role, salt })).toString('base64');
+      return `${h}.${p}.sig_${salt}`;
+    };
+
+    const userToken = makeJwtWithRole('usr-777', 'StandardUser', 'v1');
+    const elevatedToken = makeJwtWithRole('usr-777', 'ComplianceOfficer', 'v2');
+
+    (globalThis as any).fetch = async (url: string, opts: any) => {
+      callCount++;
+      const auth = opts.headers?.Authorization;
+      if (auth === `Bearer ${userToken}`) {
+        return { ok: true, status: 200, json: async () => ({ scope: 'USER_RESTRICTED', items: ['doc1'] }) };
+      }
+      if (auth === `Bearer ${elevatedToken}`) {
+        return { ok: true, status: 200, json: async () => ({ scope: 'COMPLIANCE_ELEVATED', items: ['doc1', 'doc_secret_2', 'doc_secret_3'] }) };
+      }
+      return { ok: false, status: 403, json: async () => ({ message: 'Forbidden' }) };
+    };
+
+    tokenService.set(userToken);
+    const data1 = await apiClient.get<any>('/api/restricted-documents');
+    if (data1.scope !== 'USER_RESTRICTED' || callCount !== 1) {
+      throw new Error('Échec première lecture standard');
+    }
+
+    // Lecture suivante : servie par le cache mémoire
+    const dataCached = await apiClient.get<any>('/api/restricted-documents');
+    if (dataCached.scope !== 'USER_RESTRICTED' || callCount !== 1) {
+      throw new Error('Le cache valide aurait dû servir la réponse');
+    }
+
+    // 2. L'administrateur accorde des privilèges (nouveau token de session émis)
+    tokenService.set(elevatedToken);
+
+
+    // 3. La prochaine lecture DOIT obligatoirement purger le cache et interroger le backend
+    const dataElevated = await apiClient.get<any>('/api/restricted-documents');
+    if (callCount !== 2) {
+      throw new Error(`FAILLE DE SÉCURITÉ : Le cache a renvoyé les données de l'ancien niveau d'autorisation (appels: ${callCount}) !`);
+    }
+    if (dataElevated.scope !== 'COMPLIANCE_ELEVATED' || dataElevated.items.length !== 3) {
+      throw new Error('Les nouvelles données avec permissions étendues sont erronées');
+    }
+  });
+
 
   console.log('\n=== RÉSUMÉ DES TESTS ===');
   const passedCount = results.filter((r) => r.passed).length;

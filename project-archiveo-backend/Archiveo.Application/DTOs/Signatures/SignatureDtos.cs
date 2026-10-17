@@ -78,3 +78,18 @@ public class SignatureCertificateDto
     public string Status { get; set; } = "VERIFIED_VALID";
     public string Issuer { get; set; } = "Archivéo Electronic Parapheur Authority (eIDAS Standard)";
 }
+
+public class SignaturePublicProofDto
+{
+    public Guid SignatureId { get; set; }
+    public string CertificateNumber { get; set; } = string.Empty;
+    public string DocumentReference { get; set; } = string.Empty;
+    public string DocumentTitle { get; set; } = string.Empty;
+    public string Status { get; set; } = string.Empty;
+    public DateTime? SignedAt { get; set; }
+    public string Sha256Hash { get; set; } = string.Empty;
+    public string Algorithm { get; set; } = "SHA-256 (eIDAS Timestamped)";
+    public string Issuer { get; set; } = "Archivéo Electronic Parapheur Trust Service";
+    public bool IsAuthentic { get; set; }
+}
+
