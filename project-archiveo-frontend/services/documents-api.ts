@@ -45,6 +45,54 @@ export interface CreateDocumentPayload {
   keywords?: string;
 }
 
+export interface DocumentSearchRequest {
+  query?: string;
+  typeId?: string;
+  categoryId?: string;
+  subCategoryId?: string;
+  serviceId?: string;
+  statusId?: string;
+  confidentialityId?: string;
+  languageId?: string;
+  page?: number;
+  pageSize?: number;
+  sortBy?: string;
+  sortDirection?: 'asc' | 'desc';
+}
+
+export interface PagedResult<T> {
+  items: T[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+  hasPreviousPage: boolean;
+  hasNextPage: boolean;
+}
+
+export async function searchDocuments(
+  params: DocumentSearchRequest = {},
+  signal?: AbortSignal
+): Promise<PagedResult<DocumentApi>> {
+  const queryParams = new URLSearchParams();
+  if (params.query) queryParams.set('query', params.query);
+  if (params.typeId && params.typeId !== '__all__') queryParams.set('typeId', params.typeId);
+  if (params.categoryId && params.categoryId !== '__all__') queryParams.set('categoryId', params.categoryId);
+  if (params.subCategoryId && params.subCategoryId !== '__all__') queryParams.set('subCategoryId', params.subCategoryId);
+  if (params.serviceId && params.serviceId !== '__all__') queryParams.set('serviceId', params.serviceId);
+  if (params.statusId && params.statusId !== '__all__') queryParams.set('statusId', params.statusId);
+  if (params.confidentialityId && params.confidentialityId !== '__all__') queryParams.set('confidentialityId', params.confidentialityId);
+  if (params.languageId && params.languageId !== '__all__') queryParams.set('languageId', params.languageId);
+  if (params.page !== undefined && params.page !== null) queryParams.set('page', String(params.page));
+  if (params.pageSize !== undefined && params.pageSize !== null) queryParams.set('pageSize', String(params.pageSize));
+  if (params.sortBy) queryParams.set('sortBy', params.sortBy);
+  if (params.sortDirection) queryParams.set('sortDirection', params.sortDirection);
+
+  const qs = queryParams.toString();
+  const endpoint = qs ? `/api/documents/search?${qs}` : '/api/documents/search';
+  return apiClient.get<PagedResult<DocumentApi>>(endpoint, { signal });
+}
+
 export async function fetchDocuments(): Promise<DocumentApi[]> {
   return apiClient.get<DocumentApi[]>('/api/documents');
 }

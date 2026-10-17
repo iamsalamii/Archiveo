@@ -42,6 +42,15 @@ public class DocumentsController : ControllerBase
         return Ok(docs);
     }
 
+    // GET /api/documents/search
+    [HttpGet("search")]
+    [Permission("documents.read")]
+    public async Task<IActionResult> Search([FromQuery] DocumentSearchRequest request)
+    {
+        var result = await _documentService.SearchSecuredAsync(request, GetUserId(), IsAdmin());
+        return Ok(result);
+    }
+
     // GET /api/documents/{id}
     [HttpGet("{id:guid}")]
     [Permission("documents.read")]

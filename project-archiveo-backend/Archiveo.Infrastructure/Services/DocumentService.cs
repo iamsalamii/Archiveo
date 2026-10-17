@@ -110,6 +110,129 @@ public class DocumentService
         return docs.Select(MapToDto).ToList();
     }
 
+    // GET /api/documents/search
+    public async Task<PagedResult<DocumentDto>> SearchSecuredAsync(
+        DocumentSearchRequest request,
+        Guid currentUserId,
+        bool isAdmin)
+    {
+        var page = Math.Max(1, request.Page);
+        var pageSize = Math.Clamp(request.PageSize > 0 ? request.PageSize : 20, 1, 100);
+
+        string? effectiveServiceId = null;
+
+        if (isAdmin)
+        {
+            // L'administrateur peut filtrer sur un service spécifique s'il le souhaite
+            if (!string.IsNullOrWhiteSpace(request.ServiceId) && request.ServiceId != "__all__")
+            {
+                effectiveServiceId = request.ServiceId;
+            }
+        }
+        else
+        {
+            // Récupération de l'identité et du ServiceId faisant autorité depuis la base PostgreSQL
+            var user = await _dbContext.Users.AsNoTracking()
+                .Where(u => u.Id == currentUserId && u.IsActive)
+                .Select(u => new { u.ServiceId })
+                .FirstOrDefaultAsync();
+
+            if (user == null || string.IsNullOrWhiteSpace(user.ServiceId))
+            {
+                return new PagedResult<DocumentDto>
+                {
+                    Items = new List<DocumentDto>(),
+                    TotalCount = 0,
+                    Page = page,
+                    PageSize = pageSize
+                };
+            }
+
+            // Si l'utilisateur standard tente de spécifier un ServiceId différent du sien,
+            // rejet immédiat vers une liste vide pour éviter toute énumération ou fuite
+            if (!string.IsNullOrWhiteSpace(request.ServiceId) &&
+                request.ServiceId != "__all__" &&
+                !string.Equals(request.ServiceId, user.ServiceId, StringComparison.OrdinalIgnoreCase))
+            {
+                return new PagedResult<DocumentDto>
+                {
+                    Items = new List<DocumentDto>(),
+                    TotalCount = 0,
+                    Page = page,
+                    PageSize = pageSize
+                };
+            }
+
+            effectiveServiceId = user.ServiceId;
+        }
+
+        var query = _dbContext.Documents
+            .AsNoTracking()
+            .Where(d => d.IsActive);
+
+        if (!string.IsNullOrWhiteSpace(effectiveServiceId))
+        {
+            query = query.Where(d => d.ServiceId == effectiveServiceId);
+        }
+
+        // Filtre textuel multi-champs insensible à la casse
+        if (!string.IsNullOrWhiteSpace(request.Query))
+        {
+            var q = request.Query.Trim().ToLower();
+            query = query.Where(d =>
+                d.Title.ToLower().Contains(q) ||
+                d.Reference.ToLower().Contains(q) ||
+                (d.Description != null && d.Description.ToLower().Contains(q)));
+        }
+
+        // Filtres multicritères additionnels
+        if (!string.IsNullOrWhiteSpace(request.TypeId) && request.TypeId != "__all__")
+            query = query.Where(d => d.TypeId == request.TypeId);
+
+        if (!string.IsNullOrWhiteSpace(request.CategoryId) && request.CategoryId != "__all__")
+            query = query.Where(d => d.CategoryId == request.CategoryId);
+
+        if (!string.IsNullOrWhiteSpace(request.SubCategoryId) && request.SubCategoryId != "__all__")
+            query = query.Where(d => d.SubCategoryId == request.SubCategoryId);
+
+        if (!string.IsNullOrWhiteSpace(request.StatusId) && request.StatusId != "__all__")
+            query = query.Where(d => d.StatusId == request.StatusId);
+
+        if (!string.IsNullOrWhiteSpace(request.ConfidentialityId) && request.ConfidentialityId != "__all__")
+            query = query.Where(d => d.ConfidentialityId == request.ConfidentialityId);
+
+        if (!string.IsNullOrWhiteSpace(request.LanguageId) && request.LanguageId != "__all__")
+            query = query.Where(d => d.LanguageId == request.LanguageId);
+
+        // Tri déterministe avec critère d'égalité stable sur l'Id
+        var isAsc = string.Equals(request.SortDirection, "asc", StringComparison.OrdinalIgnoreCase);
+        var sortBy = request.SortBy?.ToLowerInvariant();
+
+        query = sortBy switch
+        {
+            "title" => isAsc ? query.OrderBy(d => d.Title).ThenBy(d => d.Id) : query.OrderByDescending(d => d.Title).ThenByDescending(d => d.Id),
+            "reference" => isAsc ? query.OrderBy(d => d.Reference).ThenBy(d => d.Id) : query.OrderByDescending(d => d.Reference).ThenByDescending(d => d.Id),
+            _ => isAsc ? query.OrderBy(d => d.CreatedAt).ThenBy(d => d.Id) : query.OrderByDescending(d => d.CreatedAt).ThenByDescending(d => d.Id)
+        };
+
+        // Comptage total avant pagination (SQL COUNT(*))
+        var totalCount = await query.CountAsync();
+
+        // Matérialisation paginée (SQL LIMIT / OFFSET)
+        var items = await query
+            .Skip((page - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return new PagedResult<DocumentDto>
+        {
+            Items = items.Select(MapToDto).ToList(),
+            TotalCount = totalCount,
+            Page = page,
+            PageSize = pageSize
+        };
+    }
+
     // GET /api/documents/{id}
     public async Task<DocumentDto?> GetByIdAsync(Guid id)
     {

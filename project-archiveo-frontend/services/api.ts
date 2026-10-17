@@ -12,7 +12,13 @@ import type {
   Workflow,
   AppNotification,
 } from '@/types';
-import type { DocumentApi } from './documents-api';
+import {
+  searchDocuments as searchDocumentsApi,
+  type DocumentApi,
+  type DocumentSearchRequest,
+  type PagedResult,
+} from './documents-api';
+export type { DocumentSearchRequest, PagedResult };
 import type { ArchiveApi } from './archives-api';
 import type { LoanApi, ConsultationApi } from './loans-api';
 import type { UserApi } from './users-api';
@@ -318,6 +324,17 @@ export async function getDocuments(): Promise<GedDocument[]> {
   }
 }
 
+export async function searchDocuments(
+  params?: DocumentSearchRequest,
+  signal?: AbortSignal
+): Promise<PagedResult<GedDocument>> {
+  const res = await searchDocumentsApi(params, signal);
+  return {
+    ...res,
+    items: res.items.map(mapDocumentApiToGedDocument),
+  };
+}
+
 export async function getDocument(id: string): Promise<GedDocument | undefined> {
   try {
     const doc = await apiClient.get<DocumentApi>(`/api/documents/${id}`);
@@ -592,6 +609,7 @@ export const api = {
   updateParameterItem,
   deleteParameterItem,
   getDocuments,
+  searchDocuments,
   getDocument,
   saveDocument,
   getArchives,
