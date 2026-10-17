@@ -11,7 +11,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-archiveo_db}
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-Salamsafe52@$}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Veuillez renseigner POSTGRES_PASSWORD dans votre fichier .env}
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
@@ -38,11 +38,11 @@ services:
         condition: service_healthy
     environment:
       - ASPNETCORE_ENVIRONMENT=Production
-      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-archiveo_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:-Salamsafe52@$}
-      - Jwt__Key=${JWT_KEY:-ArchiveoSuperSecretKeyForJwtTokenGeneration2024SecureKey!}
-      - Jwt__Issuer=${JWT_ISSUER:-ArchiveoApi}
-      - Jwt__Audience=${JWT_AUDIENCE:-ArchiveoClient}
-      - Jwt__ExpiryInDays=7
+      - ConnectionStrings__DefaultConnection=Host=postgres;Port=5432;Database=${POSTGRES_DB:-archiveo_db};Username=${POSTGRES_USER:-postgres};Password=${POSTGRES_PASSWORD:?Veuillez renseigner POSTGRES_PASSWORD dans votre fichier .env}
+      - JwtSettings__Secret=${JWT_SECRET:-${JWT_KEY:?Veuillez renseigner JWT_SECRET dans votre fichier .env}}
+      - JwtSettings__Issuer=${JWT_ISSUER:-ArchiveoApi}
+      - JwtSettings__Audience=${JWT_AUDIENCE:-ArchiveoClient}
+      - JwtSettings__ExpiryInDays=7
       - SeedAdmin__Password=${ADMIN_PASSWORD:-Admin123!}
       - Storage__UploadPath=/app/uploads
     ports:

@@ -93,9 +93,24 @@ public class AuthService
     {
         var jwtSettings = _configuration.GetSection("JwtSettings");
         var secret = jwtSettings["Secret"]
+            ?? _configuration["JwtSettings:Secret"]
+            ?? _configuration["Jwt:Key"]
+            ?? _configuration["JWT_SECRET"]
             ?? throw new InvalidOperationException("JwtSettings:Secret est requis.");
         var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(secret));
         var credentials = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
+
+        var issuer = jwtSettings["Issuer"]
+            ?? _configuration["JwtSettings:Issuer"]
+            ?? _configuration["Jwt:Issuer"]
+            ?? _configuration["JWT_ISSUER"]
+            ?? "ArchiveoApi";
+
+        var audience = jwtSettings["Audience"]
+            ?? _configuration["JwtSettings:Audience"]
+            ?? _configuration["Jwt:Audience"]
+            ?? _configuration["JWT_AUDIENCE"]
+            ?? "ArchiveoClient";
 
         var claims = new List<Claim>
         {
@@ -110,8 +125,8 @@ public class AuthService
         }
 
         var token = new JwtSecurityToken(
-            issuer: jwtSettings["Issuer"],
-            audience: jwtSettings["Audience"],
+            issuer: issuer,
+            audience: audience,
             claims: claims,
             expires: DateTime.UtcNow.AddHours(1),
             signingCredentials: credentials

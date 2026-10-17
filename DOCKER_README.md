@@ -33,7 +33,7 @@ Docker va automatiquement :
 | :--- | :--- | :--- |
 | **Application Web (Frontend)** | [http://localhost:3000](http://localhost:3000) | `admin@archiveo.com` / `Admin123!` |
 | **API Backend & Swagger** | [http://localhost:5000/swagger](http://localhost:5000/swagger) | — |
-| **Base de données PostgreSQL** | `localhost:5432` | User: `postgres` / Pass: `Salamsafe52@$` |
+| **Base de données PostgreSQL** | `localhost:5432` | User: `postgres` / Pass: *(Défini dans votre fichier `.env`)* |
 
 ---
 
