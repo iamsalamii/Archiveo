@@ -30,6 +30,7 @@ import {
   Lock,
 } from 'lucide-react';
 import { printDataReport } from '@/utils/export';
+import { downloadDocument, getDownloadErrorMessage } from '@/services/documents-api';
 import { toast } from 'sonner';
 
 export interface DocumentViewerItem {
@@ -130,8 +131,17 @@ export function DocumentViewerDialog({
     );
   };
 
-  const handleDownload = () => {
-    toast.success(`Téléchargement de « ${document.fileName || document.title} » initié`);
+  const handleDownload = async () => {
+    if (!document?.id) return;
+    try {
+      await downloadDocument(document.id, document.fileName || document.title);
+      toast.success(`Téléchargement de « ${document.fileName || document.title} » démarré`);
+    } catch (err: unknown) {
+      const errorMsg = getDownloadErrorMessage(err);
+      if (errorMsg) {
+        toast.error(errorMsg);
+      }
+    }
   };
 
   const isActuallySigned = Boolean(document.signature?.isSigned);

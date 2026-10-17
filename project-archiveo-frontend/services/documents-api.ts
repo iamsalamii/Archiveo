@@ -1,4 +1,14 @@
-import { apiClient, tokenService, API_BASE_URL } from './api-client';
+import {
+  apiClient,
+  tokenService,
+  API_BASE_URL,
+  downloadBinary,
+  getDownloadErrorMessage,
+  ApiDownloadError,
+  isApiDownloadError,
+} from './api-client';
+
+export { getDownloadErrorMessage, ApiDownloadError, isApiDownloadError };
 
 export interface DocumentApi {
   id: string;
@@ -136,28 +146,26 @@ export async function validateDocument(id: string): Promise<DocumentApi> {
   return apiClient.post<DocumentApi>(`/api/documents/${id}/validate`);
 }
 
-export async function downloadDocument(id: string, fallbackName = 'document') {
-  const token = tokenService.get();
-  const response = await fetch(`${API_BASE_URL}/api/documents/${id}/download`, {
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+export async function downloadDocument(
+  id: string,
+  fallbackName = 'document',
+  signal?: AbortSignal
+): Promise<void> {
+  const { blob, filename } = await downloadBinary(`/api/documents/${id}/download`, {
+    fallbackFilename: fallbackName,
+    signal,
   });
-  if (!response.ok) throw new Error('Téléchargement impossible');
 
-  const blob = await response.blob();
-  const url = window.URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  const disposition = response.headers.get('content-disposition');
-  let filename = fallbackName;
-  if (disposition) {
-    const m = disposition.match(/filename="?([^"]+)"?/);
-    if (m) filename = m[1];
+  if (typeof window !== 'undefined') {
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    window.URL.revokeObjectURL(url);
   }
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  window.URL.revokeObjectURL(url);
 }
 
 export async function fetchDocumentVersions(id: string) {

@@ -60,6 +60,7 @@ import {
   unarchiveDocument,
   deleteDocument,
   downloadDocument,
+  getDownloadErrorMessage,
   fetchDocumentVersions,
 } from '@/services/documents-api';
 import { DocumentFormDialog } from '@/components/documents/document-form-dialog';
@@ -115,10 +116,15 @@ export default function DocumentDetailPage({ params }: { params: Promise<{ id: s
 
   const handleDownload = async () => {
     if (!doc) return;
+    const filename = doc.attachments?.[0]?.name || doc.title;
     try {
-      await downloadDocument(doc.id, doc.title);
-    } catch {
-      toast.error('Téléchargement impossible ou aucun fichier disponible');
+      await downloadDocument(doc.id, filename);
+      toast.success(`Téléchargement de « ${filename} » démarré`);
+    } catch (err: unknown) {
+      const errorMsg = getDownloadErrorMessage(err);
+      if (errorMsg) {
+        toast.error(errorMsg);
+      }
     }
   };
 

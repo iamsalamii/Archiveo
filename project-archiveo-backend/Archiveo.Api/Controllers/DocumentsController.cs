@@ -124,7 +124,10 @@ public class DocumentsController : ControllerBase
         if (notFound) return NotFoundDocument();
         if (!isAuthorized) return ForbidDocument();
 
-        if (filePath == null || !System.IO.File.Exists(filePath)) return NotFoundDocument();
+        if (filePath == null || !System.IO.File.Exists(filePath))
+        {
+            return NotFound(new { message = "Fichier physique introuvable sur le serveur de stockage." });
+        }
 
         var fileBytes = await System.IO.File.ReadAllBytesAsync(filePath);
         return File(fileBytes, mimeType ?? "application/octet-stream", fileName ?? "document");

@@ -26,6 +26,25 @@ export function isSessionAbortedError(error: unknown): error is SessionAbortedEr
 }
 
 /**
+ * Erreur spécifique levée lors d'un échec de téléchargement binaire
+ */
+export class ApiDownloadError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(status: number, message: string, code?: string) {
+    super(message);
+    this.name = 'ApiDownloadError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+export function isApiDownloadError(error: unknown): error is ApiDownloadError {
+  return error instanceof Error && error.name === 'ApiDownloadError';
+}
+
+/**
  * Extrait le claim d'identité `sub` ou `nameid` du payload JWT de manière standard.
  * 
  * NOTE DE SÉCURITÉ : Le décodage côté client sert exclusivement à partitionner le cache
@@ -438,8 +457,168 @@ export const apiClient = {
   delete: <T>(endpoint: string, options?: RequestInit) =>
     apiFetch<T>(endpoint, { ...options, method: 'DELETE' }),
 
+  download: downloadBinary,
   invalidateCache: invalidateApiCache,
   clearSession: () => {
     tokenService.remove();
   },
 };
+
+export interface DownloadBinaryOptions {
+  signal?: AbortSignal;
+  fallbackFilename?: string;
+}
+
+export interface DownloadBinaryResult {
+  blob: Blob;
+  filename: string;
+  contentType: string;
+}
+
+/**
+ * Télécharge une ressource binaire depuis l'API sécurisée.
+ * Applique l'authentification Bearer, la gestion de session (401),
+ * la détection stricte des erreurs (403, 404, 500) avec parsing JSON le cas échéant,
+ * et extrait le nom de fichier officiel depuis Content-Disposition.
+ */
+export async function downloadBinary(
+  endpoint: string,
+  options: DownloadBinaryOptions = {}
+): Promise<DownloadBinaryResult> {
+  const token = tokenService.get();
+
+  const headers: HeadersInit = {
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    method: 'GET',
+    headers,
+    signal: options.signal,
+  });
+
+  if (!response.ok) {
+    // 401 : Session expirée
+    if (response.status === 401) {
+      tokenService.remove();
+      invalidateApiCache();
+
+      const isPublicPage =
+        typeof window !== 'undefined' &&
+        (window.location.pathname === '/' ||
+          window.location.pathname === '/login' ||
+          window.location.pathname === '');
+
+      if (!isPublicPage && typeof window !== 'undefined') {
+        window.location.href = '/login';
+      }
+
+      throw new ApiDownloadError(401, 'Session expirée. Veuillez vous reconnecter.');
+    }
+
+    // 403 : Accès interdit / périmètre de service
+    if (response.status === 403) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiDownloadError(
+        403,
+        errorData.message || "Accès refusé : vous n'avez pas l'autorisation d'accéder à ce document."
+      );
+    }
+
+    // 404 : Ressource ou fichier physique manquant
+    if (response.status === 404) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new ApiDownloadError(
+        404,
+        errorData.message || 'Le document ou le fichier demandé est introuvable.'
+      );
+    }
+
+    // 500 et erreurs serveur
+    if (response.status >= 500) {
+      throw new ApiDownloadError(
+        response.status,
+        'Une erreur serveur est survenue lors de la récupération du fichier.'
+      );
+    }
+
+    // Autres erreurs HTTP (ex: 400 Bad Request)
+    const errorData = await response.json().catch(() => ({}));
+    throw new ApiDownloadError(
+      response.status,
+      errorData.message || `Erreur lors du téléchargement (${response.status})`
+    );
+  }
+
+  // 200 OK : Vérification de l'intégrité binaire
+  const contentType = response.headers.get('content-type') || 'application/octet-stream';
+
+  // Si le serveur a renvoyé du JSON malgré un 200 sur une route de téléchargement,
+  // nous nous assurons de ne pas corrompre un fichier binaire avec du JSON brut
+  if (contentType.includes('application/json')) {
+    const json = await response.json().catch(() => null);
+    if (json && json.message) {
+      throw new ApiDownloadError(200, json.message);
+    }
+  }
+
+  // Extraction du nom de fichier selon RFC 5987 / RFC 6266
+  let filename = options.fallbackFilename || 'document';
+  const disposition = response.headers.get('content-disposition');
+  if (disposition) {
+    const utf8Match = disposition.match(/filename\*=UTF-8''([^;]+)/i);
+    if (utf8Match) {
+      try {
+        filename = decodeURIComponent(utf8Match[1]);
+      } catch {
+        filename = utf8Match[1];
+      }
+    } else {
+      const standardMatch = disposition.match(/filename="?([^";]+)"?/i);
+      if (standardMatch) {
+        filename = standardMatch[1].trim();
+      }
+    }
+  }
+
+  const blob = await response.blob();
+  return { blob, filename, contentType };
+}
+
+/**
+ * Traduit une exception de téléchargement en message utilisateur clair et sécurisé
+ */
+export function getDownloadErrorMessage(err: unknown): string | null {
+  if (
+    isSessionAbortedError(err) ||
+    (err instanceof Error && (err.name === 'AbortError' || err.message?.includes('aborted')))
+  ) {
+    return null; // Annulation intentionnelle : ne pas afficher d'erreur
+  }
+
+  if (err instanceof ApiDownloadError) {
+    if (err.status === 401) {
+      return 'Session expirée. Veuillez vous reconnecter.';
+    }
+    if (err.status === 403) {
+      return err.message || "Accès refusé : vous n'avez pas l'autorisation d'accéder à ce document.";
+    }
+    if (err.status === 404) {
+      return err.message || 'Le document ou le fichier physique est introuvable sur le serveur.';
+    }
+    if (err.status >= 500) {
+      return 'Une erreur serveur est survenue lors du téléchargement. Veuillez réessayer ultérieurement.';
+    }
+    return err.message || `Erreur lors du téléchargement (${err.status})`;
+  }
+
+  if (err instanceof TypeError || (err instanceof Error && err.message?.toLowerCase().includes('network'))) {
+    return 'Erreur réseau : impossible de joindre le serveur pour le téléchargement.';
+  }
+
+  if (err instanceof Error) {
+    return err.message;
+  }
+
+  return 'Une erreur inattendue est survenue lors du téléchargement.';
+}

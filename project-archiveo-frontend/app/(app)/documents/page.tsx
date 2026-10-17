@@ -16,7 +16,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useParameters } from '@/contexts/parameters-context';
 import { useI18n } from '@/contexts/i18n-context';
 import {
-  fetchDocuments, deleteDocument, validateDocument, downloadDocument, DocumentApi,
+  fetchDocuments,
+  deleteDocument,
+  validateDocument,
+  downloadDocument,
+  getDownloadErrorMessage,
+  type DocumentApi,
 } from '@/services/documents-api';
 import { DocumentFormDialog } from '@/components/documents/document-form-dialog';
 import { DocumentViewerDialog, type DocumentViewerItem } from '@/components/documents/document-viewer-dialog';
@@ -129,8 +134,12 @@ export default function DocumentsPage() {
   const handleDownload = async (d: DocumentApi) => {
     try {
       await downloadDocument(d.id, d.fileName || d.title);
-    } catch {
-      toast.error('Aucun fichier associé');
+      toast.success(`Téléchargement de « ${d.fileName || d.title} » démarré`);
+    } catch (err: unknown) {
+      const errorMsg = getDownloadErrorMessage(err);
+      if (errorMsg) {
+        toast.error(errorMsg);
+      }
     }
   };
 
