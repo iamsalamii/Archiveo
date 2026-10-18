@@ -1,6 +1,7 @@
 using Archiveo.Api.Filters;
 using Archiveo.Api.Authorization;
 using Archiveo.Application.Services;
+using Archiveo.Application.Security;
 using Archiveo.Infrastructure.Services;
 using Archiveo.Domain.Entities;
 using Archiveo.Infrastructure.Persistence;
@@ -87,44 +88,20 @@ var jwtSecret = jwtSettings["Secret"]
     ?? builder.Configuration["Jwt:Key"]
     ?? builder.Configuration["JWT_SECRET"];
 
-var isProductionOrStaging = !builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing");
-var insecureDefaults = new[]
-{
-    "SuperSecretKeyWithAtLeast32Chars123456",
-    "ArchiveoSuperSecretKeyForJwtTokenGeneration2024SecureKey!",
-    "01234567890123456789012345678901"
-};
-
-if (string.IsNullOrWhiteSpace(jwtSecret) || jwtSecret.Length < 32)
-{
-    throw new InvalidOperationException("JwtSettings:Secret doit contenir au moins 32 caractères et être fourni hors du dépôt.");
-}
-
-if (isProductionOrStaging && insecureDefaults.Contains(jwtSecret, StringComparer.Ordinal))
-{
-    throw new InvalidOperationException("BLOCAGE DE SÉCURITÉ : La clé secrète JWT configurée est une valeur de démonstration publique connue. En environnement de production ou staging, vous devez impérativement définir un secret aléatoire fort via la variable d'environnement 'JwtSettings__Secret'.");
-}
-
-var key = Encoding.UTF8.GetBytes(jwtSecret);
+var isSensitiveEnvironment = !builder.Environment.IsDevelopment() && !builder.Environment.IsEnvironment("Testing");
+JwtSecurityPolicy.ValidateSecret(jwtSecret, isSensitiveEnvironment);
 
 var jwtIssuer = jwtSettings["Issuer"]
     ?? builder.Configuration["JwtSettings:Issuer"]
     ?? builder.Configuration["Jwt:Issuer"]
     ?? builder.Configuration["JWT_ISSUER"]
-    ?? "ArchiveoApi";
+    ?? JwtSecurityPolicy.DefaultIssuer;
 
 var canonicalAudience = jwtSettings["Audience"]
     ?? builder.Configuration["JwtSettings:Audience"]
     ?? builder.Configuration["Jwt:Audience"]
     ?? builder.Configuration["JWT_AUDIENCE"]
-    ?? "ArchiveoClient";
-
-var validAudiences = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
-{
-    canonicalAudience,
-    "ArchiveoClient",
-    "ArchiveoFrontend"
-};
+    ?? JwtSecurityPolicy.CanonicalAudience;
 
 builder.Services.AddAuthentication(options =>
 {
@@ -133,18 +110,12 @@ builder.Services.AddAuthentication(options =>
 })
 .AddJwtBearer(options =>
 {
-    options.TokenValidationParameters = new TokenValidationParameters
-    {
-        ValidateIssuer = true,
-        ValidateAudience = true,
-        ValidateLifetime = true,
-        ValidateIssuerSigningKey = true,
-        ValidIssuer = jwtIssuer,
-        ValidAudience = canonicalAudience,
-        ValidAudiences = validAudiences,
-        IssuerSigningKey = new SymmetricSecurityKey(key),
-        ClockSkew = TimeSpan.FromSeconds(30)
-    };
+    options.TokenValidationParameters = JwtSecurityPolicy.CreateValidationParameters(
+        jwtSecret!,
+        jwtIssuer,
+        canonicalAudience,
+        TimeSpan.FromSeconds(30)
+    );
 
     options.Events = new JwtBearerEvents
     {

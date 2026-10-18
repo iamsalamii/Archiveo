@@ -104,13 +104,13 @@ public class AuthService
             ?? _configuration["JwtSettings:Issuer"]
             ?? _configuration["Jwt:Issuer"]
             ?? _configuration["JWT_ISSUER"]
-            ?? "ArchiveoApi";
+            ?? Archiveo.Application.Security.JwtSecurityPolicy.DefaultIssuer;
 
         var audience = jwtSettings["Audience"]
             ?? _configuration["JwtSettings:Audience"]
             ?? _configuration["Jwt:Audience"]
             ?? _configuration["JWT_AUDIENCE"]
-            ?? "ArchiveoClient";
+            ?? Archiveo.Application.Security.JwtSecurityPolicy.CanonicalAudience;
 
         var claims = new List<Claim>
         {
