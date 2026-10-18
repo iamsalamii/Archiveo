@@ -1,3 +1,5 @@
+import { sessionSync } from './session-sync';
+
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:5000';
 
 // Le token est limité à la session du navigateur.
@@ -171,12 +173,15 @@ export const tokenService = {
     invalidateApiCache();
     sessionStorage.setItem(TOKEN_KEY, token);
   },
-  remove: () => {
+  remove: (broadcast = true) => {
     if (typeof window === 'undefined') return;
     sessionGeneration++;
     abortAllInFlight();
     invalidateApiCache();
     sessionStorage.removeItem(TOKEN_KEY);
+    if (broadcast) {
+      sessionSync.broadcastLogout();
+    }
   },
 };
 
@@ -459,8 +464,13 @@ export const apiClient = {
 
   download: downloadBinary,
   invalidateCache: invalidateApiCache,
-  clearSession: () => {
-    tokenService.remove();
+  clearSession: (broadcast = true) => {
+    tokenService.remove(broadcast);
+    if (typeof window !== 'undefined') {
+      try {
+        sessionStorage.removeItem('archiveo_param_groups_cache');
+      } catch {}
+    }
   },
 };
 
@@ -486,9 +496,14 @@ export async function downloadBinary(
   options: DownloadBinaryOptions = {}
 ): Promise<DownloadBinaryResult> {
   const token = tokenService.get();
+  const currentGen = sessionGeneration;
+
+  if (!token) {
+    throw new ApiDownloadError(401, 'Session expirée. Veuillez vous reconnecter.');
+  }
 
   const headers: HeadersInit = {
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    Authorization: `Bearer ${token}`,
   };
 
   const response = await fetch(`${API_BASE_URL}${endpoint}`, {
@@ -496,6 +511,11 @@ export async function downloadBinary(
     headers,
     signal: options.signal,
   });
+
+  // Protection stricte contre réinjection de données tardives après déconnexion
+  if (sessionGeneration !== currentGen || tokenService.get() !== token) {
+    throw new SessionAbortedError();
+  }
 
   if (!response.ok) {
     // 401 : Session expirée

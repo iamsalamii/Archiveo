@@ -10,6 +10,7 @@ import React, {
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { apiClient, tokenService } from '@/services/api-client';
+import { sessionSync } from '@/services/session-sync';
 
 // Types
 export interface UserAccount {
@@ -97,6 +98,37 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
     }, [authReady, user, pathname, router]);
 
+    // Synchronisation de session inter-onglets (ANO-06)
+    useEffect(() => {
+        const unsubscribe = sessionSync.onSessionEvent((action) => {
+            if (action.type === 'LOGOUT') {
+                // 1. Purger le token et le cache sans ré-émettre de broadcast (évite les boucles d'événements)
+                tokenService.remove(false);
+                setUser(null);
+                if (typeof window !== 'undefined') {
+                    try {
+                        sessionStorage.removeItem('archiveo_param_groups_cache');
+                    } catch {}
+                }
+
+                // 2. Rediriger immédiatement vers /login si l'onglet est sur une page protégée
+                const isPublicPage = pathname === '/' || pathname === '/login' || pathname === '';
+                if (!isPublicPage) {
+                    router.replace('/login');
+                }
+            } else if (action.type === 'LOGIN') {
+                // Si un autre onglet s'est connecté avec un compte différent, réinitialiser pour éviter la contamination
+                if (user && user.id !== action.userId) {
+                    tokenService.remove(false);
+                    setUser(null);
+                    router.replace('/login');
+                }
+            }
+        });
+
+        return unsubscribe;
+    }, [pathname, router, user]);
+
     // Connexion
     const login = useCallback(async (email: string, password: string) => {
         try {
@@ -108,6 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             tokenService.set(response.token);
             const permissions = await apiClient.get<string[]>('/api/auth/permissions');
             setUser({ ...response.user, permissions });
+            sessionSync.broadcastLogin(response.user.id);
             return true;
         } catch (error) {
             console.error('Erreur de connexion:', error);
@@ -117,8 +150,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // Déconnexion
     const logout = useCallback(() => {
-        tokenService.remove();
+        tokenService.remove(true); // Purge et diffuse l'invalidation à tous les autres onglets
         setUser(null);
+        if (typeof window !== 'undefined') {
+            try {
+                sessionStorage.removeItem('archiveo_param_groups_cache');
+            } catch {}
+        }
         router.push('/login');
     }, [router]);
 

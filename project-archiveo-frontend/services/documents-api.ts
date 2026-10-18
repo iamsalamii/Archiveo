@@ -128,6 +128,10 @@ export async function createDocument(data: CreateDocumentPayload, file?: File): 
   });
 
   if (!response.ok) {
+    if (response.status === 401) {
+      tokenService.remove(true);
+      throw new Error('Session expirée. Veuillez vous reconnecter.');
+    }
     const err = await response.json().catch(() => ({}));
     throw new Error(err.message || `Erreur ${response.status}`);
   }
@@ -207,6 +211,13 @@ export async function createDocumentVersion(
     headers: token ? { Authorization: `Bearer ${token}` } : {},
     body: formData,
   });
-  if (!response.ok) throw new Error('Création de version impossible');
+  if (!response.ok) {
+    if (response.status === 401) {
+      tokenService.remove(true);
+      throw new Error('Session expirée. Veuillez vous reconnecter.');
+    }
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.message || 'Création de version impossible');
+  }
   return response.json();
 }
