@@ -6,9 +6,10 @@ import {
   getDownloadErrorMessage,
   ApiDownloadError,
   isApiDownloadError,
+  SessionAbortedError,
 } from './api-client';
 
-export { getDownloadErrorMessage, ApiDownloadError, isApiDownloadError };
+export { getDownloadErrorMessage, ApiDownloadError, isApiDownloadError, SessionAbortedError };
 
 export interface DocumentApi {
   id: string;
@@ -121,9 +122,13 @@ export async function createDocument(data: CreateDocumentPayload, file?: File): 
   if (file) formData.append('file', file);
 
   const token = tokenService.get();
+  if (!token) {
+    throw new Error('Session expirée. Veuillez vous reconnecter.');
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/documents`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
 
@@ -135,6 +140,13 @@ export async function createDocument(data: CreateDocumentPayload, file?: File): 
     const err = await response.json().catch(() => ({}));
     throw new Error(err.message || `Erreur ${response.status}`);
   }
+
+  // Protection stricte contre réinjection par réponse tardive si déconnexion pendant l'envoi
+  if (tokenService.get() !== token) {
+    throw new SessionAbortedError();
+  }
+
+  apiClient.invalidateCache('/api/documents');
   return response.json();
 }
 
@@ -206,9 +218,13 @@ export async function createDocumentVersion(
   if (file) formData.append('file', file);
 
   const token = tokenService.get();
+  if (!token) {
+    throw new Error('Session expirée. Veuillez vous reconnecter.');
+  }
+
   const response = await fetch(`${API_BASE_URL}/api/documents/${id}/versions`, {
     method: 'POST',
-    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    headers: { Authorization: `Bearer ${token}` },
     body: formData,
   });
   if (!response.ok) {
@@ -219,5 +235,12 @@ export async function createDocumentVersion(
     const err = await response.json().catch(() => ({}));
     throw new Error(err.message || 'Création de version impossible');
   }
+
+  // Protection contre réponse tardive
+  if (tokenService.get() !== token) {
+    throw new SessionAbortedError();
+  }
+
+  apiClient.invalidateCache('/api/documents');
   return response.json();
 }

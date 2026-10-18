@@ -414,3 +414,37 @@ test('Scénario 8 : Préservation des données publiques (thème, langue)', asyn
   assert.equal(tabA.localStorage.getItem('ged-theme'), 'dark');
   assert.equal(tabA.localStorage.getItem('ged-locale'), 'fr');
 });
+
+test('Scénario 9 : Les uploads multipart refusent les réponses tardives si déconnexion survenue pendant le transfert', async () => {
+  const hub = new MockEventHub();
+  const tabA = new SimulatedBrowserTab('tabA', hub);
+  const tabB = new SimulatedBrowserTab('tabB', hub);
+
+  tabA.setToken('jwt-001', { id: 'u1' });
+  tabB.setToken('jwt-001', { id: 'u1' });
+
+  // Simulation d'un upload multipart asynchrone lent (40ms)
+  let uploadAbortedError = null;
+  const slowUpload = async () => {
+    const token = tabB.sessionStorage.get('archiveo_token');
+    await new Promise((r) => setTimeout(r, 40));
+    if (tabB.sessionStorage.get('archiveo_token') !== token) {
+      throw new Error('SessionAbortedError: Requête annulée, la session a changé.');
+    }
+    return { id: 'new-doc-123', title: 'Late Upload' };
+  };
+
+  const uploadPromise = slowUpload().catch((e) => {
+    uploadAbortedError = e;
+  });
+
+  // À 10ms, déconnexion dans l'onglet A
+  await new Promise((r) => setTimeout(r, 10));
+  tabA.logout();
+
+  await uploadPromise;
+
+  // THEN: L'upload multipart tardif doit avoir été rejeté et n'avoir laissé aucune donnée
+  assert.ok(uploadAbortedError, 'Une erreur SessionAbortedError doit être levée sur l upload tardif');
+  assert.match(uploadAbortedError.message, /SessionAbortedError/);
+});
