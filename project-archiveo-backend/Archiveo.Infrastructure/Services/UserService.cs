@@ -26,16 +26,31 @@ public class UserService
 
     public async Task<List<UserDto>> GetAllAsync()
     {
-        var users = await _userManager.Users
+        var users = await _dbContext.Users.AsNoTracking()
             .OrderBy(u => u.LastName)
             .ToListAsync();
 
-        var dtos = new List<UserDto>();
+        var userRoles = await (
+            from ur in _dbContext.UserRoles.AsNoTracking()
+            join r in _dbContext.Roles.AsNoTracking() on ur.RoleId equals r.Id
+            select new { ur.UserId, RoleName = r.Name }
+        ).ToListAsync();
+
+        var rolesByUser = userRoles
+            .Where(x => !string.IsNullOrEmpty(x.RoleName))
+            .GroupBy(x => x.UserId)
+            .ToDictionary(
+                g => g.Key,
+                g => g.Select(x => x.RoleName!).ToList()
+            );
+
+        var dtos = new List<UserDto>(users.Count);
         foreach (var u in users)
         {
-            var roles = await _userManager.GetRolesAsync(u);
-            dtos.Add(Map(u, roles.ToList()));
+            var roles = rolesByUser.TryGetValue(u.Id, out var rList) ? rList : new List<string>();
+            dtos.Add(Map(u, roles));
         }
+
         return dtos;
     }
 
