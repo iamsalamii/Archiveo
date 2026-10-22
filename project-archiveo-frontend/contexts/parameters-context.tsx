@@ -47,7 +47,7 @@ import { parameterGroups } from '@/mock/parameters';
 const CACHE_KEY = 'archiveo_param_groups_cache';
 
 export function ParametersProvider({ children }: { children: ReactNode }) {
-    const { isAuthenticated, authReady } = useAuth();
+    const { isAuthenticated, authReady, user } = useAuth();
     const [groups, setGroups] = useState<ParameterGroup[]>(() => {
         if (typeof window !== 'undefined') {
             try {
@@ -65,6 +65,16 @@ export function ParametersProvider({ children }: { children: ReactNode }) {
 
     const refresh = useCallback(async () => {
         setError(null);
+
+        // Ne déclencher la requête réseau que si le profil détient la permission de lecture des paramètres
+        const canReadParams = Boolean(
+            user?.roles?.includes('Admin') || user?.permissions?.includes('parameters.read')
+        );
+        if (!canReadParams) {
+            setIsLoading(false);
+            return;
+        }
+
         try {
             const data = await getParameterGroups();
             if (Array.isArray(data) && data.length > 0) {
@@ -89,7 +99,7 @@ export function ParametersProvider({ children }: { children: ReactNode }) {
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, [user]);
 
     useEffect(() => {
         if (authReady) {

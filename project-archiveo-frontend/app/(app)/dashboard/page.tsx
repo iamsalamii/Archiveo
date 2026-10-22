@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { PageHeader } from '@/components/shared/page-header';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,7 @@ import { api } from '@/services/api';
 import { getIcon } from '@/utils/icons';
 import { ColorBadge } from '@/components/shared/color-badge';
 import { cn } from '@/lib/utils';
-import type { GedDocument, ArchiveRecord, ActivityLog, UserAccount, LoanRecord } from '@/types';
+import type { GedDocument, ArchiveRecord, ActivityLog, LoanRecord } from '@/types';
 import {
   FileText,
   Archive,
@@ -60,34 +60,46 @@ export default function DashboardPage() {
   const [docs, setDocs] = useState<GedDocument[]>([]);
   const [archives, setArchives] = useState<ArchiveRecord[]>([]);
   const [activities, setActivities] = useState<ActivityLog[]>([]);
-  const [users, setUsers] = useState<UserAccount[]>([]);
   const [loans, setLoans] = useState<LoanRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const loadDashboardData = () => {
+  // Droits d'accès effectifs basés sur les rôles et permissions du profil connecté
+  const canReadDocs = Boolean(user?.roles?.includes('Admin') || user?.permissions?.includes('documents.read'));
+  const canReadArchives = Boolean(user?.roles?.includes('Admin') || user?.permissions?.includes('archives.read'));
+  const canReadAudit = Boolean(user?.roles?.includes('Admin') || user?.permissions?.includes('audit.read'));
+  const canReadLoans = Boolean(user?.roles?.includes('Admin') || user?.permissions?.includes('loans.read'));
+
+  const loadDashboardData = useCallback(() => {
     setLoading(true);
-    Promise.all([
-      api.getDocuments(),
-      api.getArchives(),
-      api.getActivityLog(),
-      api.getUsers(),
-      api.getLoans(),
-    ])
-      .then(([d, a, act, u, l]) => {
+    setError(null);
+
+    // Ne solliciter les endpoints que si l'utilisateur possède la permission requise,
+    // évitant ainsi les erreurs 403 et les mécanismes de repli vers des données fictives.
+    const docsPromise = canReadDocs ? api.getDocuments() : Promise.resolve([]);
+    const archivesPromise = canReadArchives ? api.getArchives() : Promise.resolve([]);
+    const auditPromise = canReadAudit ? api.getActivityLog() : Promise.resolve([]);
+    const loansPromise = canReadLoans ? api.getLoans() : Promise.resolve([]);
+
+    Promise.all([docsPromise, archivesPromise, auditPromise, loansPromise])
+      .then(([d, a, act, l]) => {
         setDocs(d);
         setArchives(a);
         setActivities(act);
-        setUsers(u);
         setLoans(l);
+      })
+      .catch((err) => {
+        console.error('Erreur chargement données dashboard:', err);
+        setError('Impossible de récupérer l’ensemble des données du tableau de bord. Veuillez vérifier votre connexion ou réessayer.');
       })
       .finally(() => {
         setLoading(false);
       });
-  };
+  }, [canReadDocs, canReadArchives, canReadAudit, canReadLoans]);
 
   useEffect(() => {
     loadDashboardData();
-  }, []);
+  }, [loadDashboardData]);
 
   const kpis = useMemo(() => {
     const expired = docs.filter((d) => d.expiresAt && new Date(d.expiresAt) < new Date()).length;
@@ -224,12 +236,6 @@ export default function DashboardPage() {
     ];
   }, [docs, archives]);
 
-  const canViewAudit = Boolean(
-    user?.roles?.includes('Admin') ||
-    user?.roles?.includes('RecordsManager') ||
-    user?.permissions?.includes('audit.read')
-  );
-
   if (loading) {
     return (
       <div className="space-y-6">
@@ -278,6 +284,24 @@ export default function DashboardPage() {
           </Button>
         }
       />
+
+      {error && (
+        <div className="flex items-center justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/10 p-4 text-sm text-destructive">
+          <div className="flex items-center gap-3">
+            <AlertTriangle className="h-5 w-5 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadDashboardData}
+            className="shrink-0 border-destructive/40 hover:bg-destructive/15 text-destructive"
+          >
+            <RotateCcw className="mr-1.5 h-3.5 w-3.5" />
+            Réessayer
+          </Button>
+        </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
@@ -330,33 +354,41 @@ export default function DashboardPage() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {topUsers.map((u, i) => (
-              <div key={u.name} className="flex items-center gap-3">
-                <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
-                  i === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400' :
-                  i === 1 ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' :
-                  i === 2 ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400' :
-                  'bg-muted text-muted-foreground'
-                }`}>
-                  {i + 1}
-                </div>
-                <Avatar className="h-8 w-8">
-                  <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                    {(u.name || '').split(' ').map((n) => n[0]).join('').slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <p className="text-sm font-medium">{u.name}</p>
-                  <p className="text-xs text-muted-foreground">{u.count} actions</p>
-                </div>
+            {topUsers.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground italic">
+                {canReadAudit
+                  ? 'Aucune activité récente enregistrée.'
+                  : 'Statistiques d’activité réservées aux profils de direction et d’audit.'}
               </div>
-            ))}
+            ) : (
+              topUsers.map((u, i) => (
+                <div key={u.name} className="flex items-center gap-3">
+                  <div className={`flex h-8 w-8 items-center justify-center rounded-full text-xs font-bold ${
+                    i === 0 ? 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400' :
+                    i === 1 ? 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300' :
+                    i === 2 ? 'bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-400' :
+                    'bg-muted text-muted-foreground'
+                  }`}>
+                    {i + 1}
+                  </div>
+                  <Avatar className="h-8 w-8">
+                    <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                      {(u.name || '').split(' ').map((n) => n[0]).join('').slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">{u.name}</p>
+                    <p className="text-xs text-muted-foreground">{u.count} actions</p>
+                  </div>
+                </div>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>
 
       {/* Recent activity — Conditionné aux droits d'audit */}
-      {canViewAudit && (
+      {canReadAudit && (
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
