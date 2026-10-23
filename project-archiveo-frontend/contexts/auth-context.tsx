@@ -9,7 +9,7 @@ import React, {
     ReactNode,
 } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
-import { apiClient, tokenService } from '@/services/api-client';
+import { apiClient, tokenService, isApiError } from '@/services/api-client';
 import { sessionSync } from '@/services/session-sync';
 
 // Types
@@ -37,13 +37,20 @@ interface LoginResponse {
     user: UserAccount;
 }
 
+export interface LoginResult {
+    success: boolean;
+    status?: number;
+    message?: string;
+    retryAfter?: number | null;
+}
+
 interface AuthContextType {
     user: UserAccount | null;
     isAuthenticated: boolean;
     authReady: boolean;
     mustChangePassword: boolean;
     allUsers: UserAccount[];
-    login: (email: string, password: string) => Promise<boolean>;
+    login: (email: string, password: string) => Promise<LoginResult>;
     logout: () => void;
     changePassword: (currentPassword: string, newPassword: string) => Promise<boolean>;
     createUser: (user: Partial<UserAccount>) => Promise<boolean>;
@@ -130,7 +137,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }, [pathname, router, user]);
 
     // Connexion
-    const login = useCallback(async (email: string, password: string) => {
+    const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
         try {
             const response = await apiClient.post<LoginResponse>('/api/auth/login', {
                 email,
@@ -141,10 +148,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const permissions = await apiClient.get<string[]>('/api/auth/permissions');
             setUser({ ...response.user, permissions });
             sessionSync.broadcastLogin(response.user.id);
-            return true;
-        } catch (error) {
-            console.error('Erreur de connexion:', error);
-            return false;
+            return { success: true };
+        } catch (error: any) {
+            console.error('Erreur de connexion:', error?.message || 'Erreur');
+            if (isApiError(error)) {
+                return {
+                    success: false,
+                    status: error.status,
+                    message: error.message,
+                    retryAfter: error.retryAfter ?? null,
+                };
+            }
+            return {
+                success: false,
+                status: undefined,
+                message: error?.message || 'Une erreur est survenue lors de la connexion',
+            };
         }
     }, []);
 

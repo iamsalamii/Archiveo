@@ -47,6 +47,27 @@ export function isApiDownloadError(error: unknown): error is ApiDownloadError {
 }
 
 /**
+ * Erreur HTTP typée pour propager le statut HTTP, les en-têtes et le corps d'erreur
+ */
+export class ApiError extends Error {
+  readonly status: number;
+  readonly retryAfter?: number | null;
+  readonly data?: any;
+
+  constructor(status: number, message: string, retryAfter?: number | null, data?: any) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.retryAfter = retryAfter;
+    this.data = data;
+  }
+}
+
+export function isApiError(error: unknown): error is ApiError {
+  return error instanceof Error && error.name === 'ApiError';
+}
+
+/**
  * Extrait le claim d'identité `sub` ou `nameid` du payload JWT de manière standard.
  * 
  * NOTE DE SÉCURITÉ : Le décodage côté client sert exclusivement à partitionner le cache
@@ -425,11 +446,25 @@ async function apiFetchInternal<T>(
         window.location.href = '/login';
       }
 
-      throw new Error('Session expirée. Veuillez vous reconnecter.');
+      throw new ApiError(401, 'Session expirée. Veuillez vous reconnecter.');
     }
 
     const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `Erreur ${response.status}`);
+    const retryAfterHeader = response.headers.get('Retry-After');
+    const parsedRetryAfter = retryAfterHeader ? parseInt(retryAfterHeader, 10) : null;
+    const retryAfter = parsedRetryAfter !== null && !isNaN(parsedRetryAfter) && parsedRetryAfter > 0 ? parsedRetryAfter : null;
+
+    let defaultMsg = `Erreur ${response.status}`;
+    if (response.status === 429) {
+      defaultMsg = 'Trop de tentatives de connexion. Veuillez patienter avant de réessayer.';
+    }
+
+    throw new ApiError(
+      response.status,
+      errorData.message || defaultMsg,
+      retryAfter,
+      errorData
+    );
   }
 
   // Cas particulier : réponse vide (204 No Content)

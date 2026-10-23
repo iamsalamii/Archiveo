@@ -26,18 +26,30 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const success = await login(email, password);
+      const result = await login(email, password);
 
-      if (success) {
+      if (result.success) {
         toast.success('Connexion réussie ! Bienvenue.');
         router.push('/dashboard');
-      } else {
+      } else if (result.status === 429) {
+        let msg = 'Trop de tentatives de connexion. Veuillez patienter avant de réessayer.';
+        if (result.retryAfter && result.retryAfter > 0) {
+          const unit = result.retryAfter === 1 ? 'seconde' : 'secondes';
+          msg = `Trop de tentatives de connexion. Veuillez patienter ${result.retryAfter} ${unit} avant de réessayer.`;
+        }
+        setError(msg);
+        toast.error(msg);
+      } else if (result.status === 401) {
         const errorMsg = 'Email ou mot de passe incorrect';
         setError(errorMsg);
         toast.error(errorMsg);
+      } else {
+        const errorMsg = result.message || 'Une erreur est survenue lors de la connexion';
+        setError(errorMsg);
+        toast.error(errorMsg);
       }
-    } catch (err) {
-      const errorMsg = 'Une erreur est survenue lors de la connexion';
+    } catch (err: any) {
+      const errorMsg = err?.message || 'Une erreur est survenue lors de la connexion';
       setError(errorMsg);
       toast.error(errorMsg);
     } finally {
@@ -157,7 +169,7 @@ export default function LoginPage() {
 
             <div className="mt-4 text-center">
               <Link href="/" className="text-sm text-muted-foreground hover:text-primary">
-                ← Retour à l'accueil
+                ← Retour à l&apos;accueil
               </Link>
             </div>
           </CardContent>
