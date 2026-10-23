@@ -1,8 +1,10 @@
+using Archiveo.Api.Security;
 using Archiveo.Application.DTOs.Auth;
 using Archiveo.Application.Services;
 using Archiveo.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 using System.Security.Claims;
 
 namespace Archiveo.Api.Controllers;
@@ -21,6 +23,7 @@ public class AuthController : ControllerBase
     }
 
     [HttpPost("login")]
+    [EnableRateLimiting(AuthRateLimitingConfig.PolicyName)]
     public async Task<IActionResult> Login([FromBody] LoginRequest request)
     {
         var response = await _authService.LoginAsync(request);

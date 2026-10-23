@@ -1,7 +1,9 @@
 using Archiveo.Api.Filters;
 using Archiveo.Api.Authorization;
+using Archiveo.Api.Security;
 using Archiveo.Application.Services;
 using Archiveo.Application.Security;
+using Microsoft.AspNetCore.RateLimiting;
 using Archiveo.Infrastructure.Services;
 using Archiveo.Domain.Entities;
 using Archiveo.Infrastructure.Persistence;
@@ -168,6 +170,9 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Rate limiting natif ASP.NET Core (.NET 9) pour l'authentification
+builder.Services.AddAuthRateLimiting();
+
 var app = builder.Build();
 
 // Middleware
@@ -183,6 +188,7 @@ app.Use(async (context, next) =>
     await next();
 });
 app.UseCors("AllowFrontend");
+app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
