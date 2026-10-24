@@ -170,6 +170,9 @@ builder.Services.AddCors(options =>
     });
 });
 
+// Configuration stricte des en-têtes transférés pour Reverse Proxy (Phase 5A)
+builder.Services.AddConfiguredForwardedHeaders(builder.Configuration);
+
 // Rate limiting natif ASP.NET Core (.NET 9) pour l'authentification
 builder.Services.AddAuthRateLimiting();
 
@@ -180,6 +183,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseHttpsRedirection();
+app.UseForwardedHeaders();
 app.Use(async (context, next) =>
 {
     context.Response.Headers["X-Content-Type-Options"] = "nosniff";

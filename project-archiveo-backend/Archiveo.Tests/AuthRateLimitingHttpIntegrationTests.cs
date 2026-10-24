@@ -66,16 +66,17 @@ public class SpyUserStore : IUserStore<User>, IUserEmailStore<User>
 }
 
 /// <summary>
-/// Suite de tests d'intégration HTTP traversant le pipeline ASP.NET Core réel via TestServer (Phase 4D-2).
-/// Valide le comportement du Rate Limiter (AuthLoginPolicy) de bout en bout :
+/// Suite de tests d'intégration HTTP traversant le pipeline ASP.NET Core réel via TestServer (Phases 4D-2 et 5A).
+/// Valide le comportement du Rate Limiter (AuthLoginPolicy) et la résolution sécurisée derrière Reverse Proxy :
 /// - Véritables requêtes et réponses HTTP via HttpClient
-/// - Traversée du middleware UseRateLimiter() et des attributs [EnableRateLimiting]
+/// - Traversée de UseForwardedHeaders() et UseRateLimiter() dans l'ordre de production
+/// - Résolution de l'IP cliente depuis X-Forwarded-For uniquement pour les proxys de confiance (Loopback / configurés)
+/// - Rejet strict des falsifications d'en-têtes par des pairs non autorisés
 /// - Isolation PostgreSQL absolue (0 connexion vers les ports 5432/5433, aucune migration)
-/// - Simulation d'adresses IP distantes stricte et déterministe via middleware dédié de test
 /// </summary>
 public class AuthRateLimitingHttpIntegrationTests
 {
-    private (TestServer Server, HttpClient Client, SpyUserStore UserStore, string DbName) CreateIsolatedTestServer()
+    private (TestServer Server, HttpClient Client, SpyUserStore UserStore, string DbName) CreateIsolatedTestServer(IConfiguration? configuration = null)
     {
         var spyUserStore = new SpyUserStore();
         var inMemoryDbName = $"Test_RateLimiting_{Guid.NewGuid()}";
@@ -108,12 +109,15 @@ public class AuthRateLimitingHttpIntegrationTests
                 services.AddScoped<AuditService>();
                 services.AddHttpContextAccessor();
 
+                // Configuration stricte des ForwardedHeaders de production (Phase 5A)
+                services.AddConfiguredForwardedHeaders(configuration);
+
                 // Configuration du Rate Limiting réel de production (.NET 9)
                 services.AddAuthRateLimiting();
             })
             .Configure(app =>
             {
-                // Middleware de simulation d'IP distante exclusif au harnais de test
+                // Middleware de simulation du pair TCP distant (exclusif au harnais de test)
                 app.Use(async (context, next) =>
                 {
                     if (context.Request.Headers.TryGetValue("X-Test-IP", out var headerVal))
@@ -125,18 +129,21 @@ public class AuthRateLimitingHttpIntegrationTests
                         }
                         else
                         {
-                            // IP non parseable : repli déterministe sans accepter de valeur invalide
+                            // IP non parseable : repli déterministe
                             context.Connection.RemoteIpAddress = IPAddress.Loopback;
                         }
                     }
                     else
                     {
-                        // En-tête absent : repli déterministe
+                        // En-tête absent : repli déterministe sur Loopback
                         context.Connection.RemoteIpAddress = IPAddress.Loopback;
                     }
 
                     await next();
                 });
+
+                // Ordre de production : UseForwardedHeaders avant UseRateLimiter
+                app.UseForwardedHeaders();
 
                 app.UseRouting();
                 app.UseRateLimiter();
@@ -151,7 +158,7 @@ public class AuthRateLimitingHttpIntegrationTests
         return (server, client, spyUserStore, inMemoryDbName);
     }
 
-    private HttpRequestMessage CreateLoginRequest(string ipAddress)
+    private HttpRequestMessage CreateLoginRequest(string peerIp, string? forwardedFor = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
         {
@@ -161,14 +168,174 @@ public class AuthRateLimitingHttpIntegrationTests
                 Password = "InvalidPassword123!"
             })
         };
-        request.Headers.Add("X-Test-IP", ipAddress);
+        request.Headers.Add("X-Test-IP", peerIp);
+        if (!string.IsNullOrEmpty(forwardedFor))
+        {
+            request.Headers.Add("X-Forwarded-For", forwardedFor);
+        }
         return request;
     }
 
+    // =========================================================================
+    // SCÉNARIOS PHASE 5A : RÉSOLUTION IP DERRIÈRE REVERSE PROXY (T1 à T5)
+    // =========================================================================
+
     [Fact]
-    public async Task Scenario_S1_UnderQuota_FirstTenRequests_AreAllowedThroughAndReturn401()
+    public async Task Scenario_T1_TrustedProxy_ValidXForwardedFor_UsesClientIpForRateLimiting()
     {
-        // S1 : Les 10 premières requêtes consécutives sous le quota nominal de 10 req/min
+        // T1 : Une requête provenant du proxy autorisé (127.0.0.1) avec un X-Forwarded-For valide
+        // utilise l'IP cliente attendue pour la partition du rate limiter.
+        var (server, client, spyStore, _) = CreateIsolatedTestServer();
+        using (server)
+        using (client)
+        {
+            const string proxyIp = "127.0.0.1";
+            const string clientIp = "203.0.113.10";
+
+            // 10 requêtes sous quota
+            for (int i = 1; i <= AuthRateLimitingConfig.DefaultPermitLimit; i++)
+            {
+                using var req = CreateLoginRequest(proxyIp, clientIp);
+                using var res = await client.SendAsync(req);
+                Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+                Assert.False(res.Headers.Contains("Retry-After"));
+            }
+
+            Assert.Equal(10, spyStore.FindByEmailCallCount);
+
+            // 11e requête : doit dépasser le quota de l'IP cliente (429)
+            using var req11 = CreateLoginRequest(proxyIp, clientIp);
+            using var res11 = await client.SendAsync(req11);
+
+            Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
+            Assert.True(res11.Headers.Contains("Retry-After"));
+            Assert.Equal(10, spyStore.FindByEmailCallCount); // AuthService court-circuité
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_T2_TrustedProxy_DistinctClients_HaveIndependentQuotas()
+    {
+        // T2 : Deux IP clientes distinctes transmises par le proxy de confiance disposent de quotas indépendants.
+        var (server, client, spyStore, _) = CreateIsolatedTestServer();
+        using (server)
+        using (client)
+        {
+            const string proxyIp = "127.0.0.1";
+            const string client1 = "203.0.113.21";
+            const string client2 = "203.0.113.22";
+
+            // Saturer Client 1 (11 requêtes)
+            for (int i = 0; i < 11; i++)
+            {
+                using var req = CreateLoginRequest(proxyIp, client1);
+                await client.SendAsync(req);
+            }
+
+            // Client 1 est bloqué
+            using var reqBlocked = CreateLoginRequest(proxyIp, client1);
+            using var resBlocked = await client.SendAsync(reqBlocked);
+            Assert.Equal(HttpStatusCode.TooManyRequests, resBlocked.StatusCode);
+
+            // Client 2 transite par le MÊME proxy : ne doit PAS être bloqué par Client 1 !
+            using var reqClient2 = CreateLoginRequest(proxyIp, client2);
+            using var resClient2 = await client.SendAsync(reqClient2);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resClient2.StatusCode);
+            Assert.False(resClient2.Headers.Contains("Retry-After"));
+            Assert.Equal(11, spyStore.FindByEmailCallCount); // 10 de Client 1 + 1 de Client 2
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_T3_UntrustedPeer_SpoofedXForwardedFor_IsIgnoredAndCannotBypassRateLimiter()
+    {
+        // T3 : Un client non autorisé (pair direct untrusted) ne peut pas modifier sa partition en fournissant arbitrairement X-Forwarded-For.
+        var (server, client, spyStore, _) = CreateIsolatedTestServer();
+        using (server)
+        using (client)
+        {
+            const string untrustedPeerIp = "198.51.100.99";
+
+            // L'attaquant envoie 10 requêtes avec un X-Forwarded-For forgé
+            for (int i = 1; i <= 10; i++)
+            {
+                using var req = CreateLoginRequest(untrustedPeerIp, $"203.0.113.{i}");
+                using var res = await client.SendAsync(req);
+                Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+            }
+
+            Assert.Equal(10, spyStore.FindByEmailCallCount);
+
+            // À la 11e requête, l'attaquant change son X-Forwarded-For pour tenter d'échapper au rate limiter
+            using var reqEvasion = CreateLoginRequest(untrustedPeerIp, "192.0.2.254");
+            using var resEvasion = await client.SendAsync(reqEvasion);
+
+            // Puisque untrustedPeerIp n'est pas dans KnownProxies, X-Forwarded-For a été ignoré !
+            // La partition est restée indexée sur untrustedPeerIp -> la 11e requête est bloquée en 429 !
+            Assert.Equal(HttpStatusCode.TooManyRequests, resEvasion.StatusCode);
+            Assert.Equal(10, spyStore.FindByEmailCallCount);
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_T4_HeaderChain_MultipleValues_RespectsForwardLimitOne()
+    {
+        // T4 : Les valeurs multiples dans X-Forwarded-For ne permettent pas de contourner la limite ; ForwardLimit = 1 est respecté.
+        var (server, client, spyStore, _) = CreateIsolatedTestServer();
+        using (server)
+        using (client)
+        {
+            const string proxyIp = "127.0.0.1";
+            // Chaîne à deux sauts : client réel (proche du proxy) = 203.0.113.30, IP forgée en amont = 198.51.100.1
+            const string headerChain = "198.51.100.1, 203.0.113.30";
+
+            for (int i = 1; i <= 10; i++)
+            {
+                using var req = CreateLoginRequest(proxyIp, headerChain);
+                using var res = await client.SendAsync(req);
+                Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+            }
+
+            // 11e requête avec la même chaîne : doit être bloquée sur l'IP résolue (203.0.113.30)
+            using var req11 = CreateLoginRequest(proxyIp, headerChain);
+            using var res11 = await client.SendAsync(req11);
+
+            Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_T5_DirectAccess_WithoutForwardedHeaders_PreservesNormalBehavior()
+    {
+        // T5 : Une requête directe sans en-tête transféré conserve le comportement nominal direct.
+        var (server, client, spyStore, _) = CreateIsolatedTestServer();
+        using (server)
+        using (client)
+        {
+            const string directIp = "198.51.100.40";
+
+            for (int i = 1; i <= 10; i++)
+            {
+                using var req = CreateLoginRequest(directIp, forwardedFor: null);
+                using var res = await client.SendAsync(req);
+                Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+            }
+
+            using var req11 = CreateLoginRequest(directIp, forwardedFor: null);
+            using var res11 = await client.SendAsync(req11);
+
+            Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
+        }
+    }
+
+    // =========================================================================
+    // SCÉNARIOS NON-RÉGRESSION PHASE 4D-2 (T6 / S1 à S6)
+    // =========================================================================
+
+    [Fact]
+    public async Task Scenario_T6_S1_UnderQuota_FirstTenRequests_AreAllowedThroughAndReturn401()
+    {
         var (server, client, spyStore, _) = CreateIsolatedTestServer();
         using (server)
         using (client)
@@ -180,27 +347,23 @@ public class AuthRateLimitingHttpIntegrationTests
                 using var request = CreateLoginRequest(ip);
                 using var response = await client.SendAsync(request);
 
-                // Doit traverser jusqu'au contrôleur et retourner 401 Unauthorized
                 Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
-                Assert.False(response.Headers.Contains("Retry-After"), $"La requête #{i} sous quota ne doit pas comporter Retry-After.");
+                Assert.False(response.Headers.Contains("Retry-After"));
             }
 
-            // Vérification que le service métier d'authentification a bien été sollicité 10 fois
             Assert.Equal(10, spyStore.FindByEmailCallCount);
         }
     }
 
     [Fact]
-    public async Task Scenario_S2_ExceedQuota_EleventhRequest_Returns429_WithRetryAfter_AndShortCircuitsPipeline()
+    public async Task Scenario_T6_S2_ExceedQuota_EleventhRequest_Returns429_WithRetryAfter_AndShortCircuitsPipeline()
     {
-        // S2 : La 11e requête consécutive depuis la même IP dépasse le quota et court-circuite le contrôleur
-        var (server, client, spyStore, dbName) = CreateIsolatedTestServer();
+        var (server, client, spyStore, _) = CreateIsolatedTestServer();
         using (server)
         using (client)
         {
             const string ip = "198.51.100.20";
 
-            // Épuiser le quota de 10
             for (int i = 1; i <= 10; i++)
             {
                 using var req = CreateLoginRequest(ip);
@@ -210,23 +373,19 @@ public class AuthRateLimitingHttpIntegrationTests
 
             Assert.Equal(10, spyStore.FindByEmailCallCount);
 
-            // 11e requête : dépassement de quota
             using var eleventhReq = CreateLoginRequest(ip);
             using var eleventhRes = await client.SendAsync(eleventhReq);
 
-            // Assertions HTTP
             Assert.Equal(HttpStatusCode.TooManyRequests, eleventhRes.StatusCode);
-            Assert.True(eleventhRes.Headers.Contains("Retry-After"), "La réponse 429 doit contenir l'en-tête 'Retry-After'.");
+            Assert.True(eleventhRes.Headers.Contains("Retry-After"));
 
             var retryAfterValues = eleventhRes.Headers.GetValues("Retry-After");
             var retryAfterStr = Assert.Single(retryAfterValues);
-            Assert.True(int.TryParse(retryAfterStr, out var seconds), "L'en-tête Retry-After doit être un entier valide.");
-            Assert.True(seconds > 0, "L'en-tête Retry-After doit spécifier une durée positive.");
+            Assert.True(int.TryParse(retryAfterStr, out var seconds));
+            Assert.True(seconds > 0);
 
-            // Le pipeline a été court-circuité : AuthService NE DOIT PAS être appelé pour la 11e requête
             Assert.Equal(10, spyStore.FindByEmailCallCount);
 
-            // Vérification des logs d'audit en mémoire : seuls les 10 appels sous quota ont été audités
             using var scope = server.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
             var auditCount = await db.AuditLogs.CountAsync();
@@ -235,23 +394,20 @@ public class AuthRateLimitingHttpIntegrationTests
     }
 
     [Fact]
-    public async Task Scenario_S3_JsonResponseFormat_MatchesContractStrictly()
+    public async Task Scenario_T6_S3_JsonResponseFormat_MatchesContractStrictly()
     {
-        // S3 : Vérification du contrat JSON retourné par HandleOnRejectedAsync
         var (server, client, _, _) = CreateIsolatedTestServer();
         using (server)
         using (client)
         {
             const string ip = "198.51.100.30";
 
-            // Épuiser le quota
             for (int i = 0; i < 10; i++)
             {
                 using var req = CreateLoginRequest(ip);
                 await client.SendAsync(req);
             }
 
-            // Déclencher le 429
             using var req429 = CreateLoginRequest(ip);
             using var res429 = await client.SendAsync(req429);
 
@@ -272,9 +428,8 @@ public class AuthRateLimitingHttpIntegrationTests
     }
 
     [Fact]
-    public async Task Scenario_S4_IpPartitioning_AllowsIndependentTrafficFromOtherIps()
+    public async Task Scenario_T6_S4_IpPartitioning_AllowsIndependentTrafficFromOtherIps()
     {
-        // S4 : Partitionnement IP - une seconde IP n'est pas bloquée par la saturation de la première
         var (server, client, spyStore, _) = CreateIsolatedTestServer();
         using (server)
         using (client)
@@ -282,41 +437,35 @@ public class AuthRateLimitingHttpIntegrationTests
             const string ip1 = "198.51.100.41";
             const string ip2 = "198.51.100.42";
 
-            // Saturer IP 1
             for (int i = 0; i < 11; i++)
             {
                 using var req = CreateLoginRequest(ip1);
                 await client.SendAsync(req);
             }
 
-            // Vérifier que IP 1 est bien bloquée
             using var blockedReq = CreateLoginRequest(ip1);
             using var blockedRes = await client.SendAsync(blockedReq);
             Assert.Equal(HttpStatusCode.TooManyRequests, blockedRes.StatusCode);
 
-            // IP 2 émet une requête : doit être acceptée sous son propre quota
             using var ip2Req = CreateLoginRequest(ip2);
             using var ip2Res = await client.SendAsync(ip2Req);
 
             Assert.Equal(HttpStatusCode.Unauthorized, ip2Res.StatusCode);
             Assert.False(ip2Res.Headers.Contains("Retry-After"));
 
-            // Les 10 premières d'IP 1 + la première d'IP 2 = 11 appels à AuthService
             Assert.Equal(11, spyStore.FindByEmailCallCount);
         }
     }
 
     [Fact]
-    public async Task Scenario_S5_UnprotectedEndpoints_AreNotLimitedByAuthLoginPolicy()
+    public async Task Scenario_T6_S5_UnprotectedEndpoints_AreNotLimitedByAuthLoginPolicy()
     {
-        // S5 : Vérifie qu'un endpoint non protégé par AuthLoginPolicy (ex: POST /api/auth/logout) n'est pas limité
         var (server, client, _, _) = CreateIsolatedTestServer();
         using (server)
         using (client)
         {
             const string ip = "198.51.100.50";
 
-            // Émettre 15 requêtes consécutives vers logout depuis la même IP
             for (int i = 1; i <= 15; i++)
             {
                 using var logoutReq = new HttpRequestMessage(HttpMethod.Post, "/api/auth/logout");
@@ -329,9 +478,8 @@ public class AuthRateLimitingHttpIntegrationTests
     }
 
     [Fact]
-    public void Scenario_S6_Isolation_NoPostgresConnectionStringOrMigrationExecuted()
+    public void Scenario_T6_S6_Isolation_NoPostgresConnectionStringOrMigrationExecuted()
     {
-        // S6 : Démontre l'isolation totale : la configuration n'utilise aucune chaîne de connexion PostgreSQL
         var (server, client, _, _) = CreateIsolatedTestServer();
         using (server)
         using (client)
@@ -339,7 +487,6 @@ public class AuthRateLimitingHttpIntegrationTests
             using var scope = server.Services.CreateScope();
             var db = scope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
 
-            // Le provider utilisé doit impérativement être InMemory
             Assert.Equal("Microsoft.EntityFrameworkCore.InMemory", db.Database.ProviderName);
             Assert.False(db.Database.IsNpgsql(), "Le test ne doit en aucun cas utiliser le provider Npgsql.");
         }

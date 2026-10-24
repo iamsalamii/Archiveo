@@ -1,8 +1,12 @@
+using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Net;
 using System.Text.Json;
 using System.Threading;
 using System.Threading.RateLimiting;
@@ -107,6 +111,43 @@ public static class AuthRateLimitingConfig
                     }
                 );
             });
+        });
+
+        return services;
+    }
+
+    /// <summary>
+    /// Configure de manière stricte les en-têtes transférés (ForwardedHeaders) pour la résolution sécurisée
+    /// de l'adresse IP cliente distante derrière un reverse proxy (Phase 5A).
+    /// </summary>
+    public static IServiceCollection AddConfiguredForwardedHeaders(this IServiceCollection services, IConfiguration? configuration = null)
+    {
+        services.Configure<ForwardedHeadersOptions>(options =>
+        {
+            options.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+            options.ForwardLimit = 1;
+
+            options.KnownProxies.Clear();
+            options.KnownNetworks.Clear();
+
+            // Proxys de confiance vérifiés par défaut : Loopback (Nginx sur hôte)
+            options.KnownProxies.Add(IPAddress.Loopback);
+            options.KnownProxies.Add(IPAddress.IPv6Loopback);
+
+            if (configuration != null)
+            {
+                var configuredProxies = configuration.GetSection("ForwardedHeaders:KnownProxies").Get<string[]>();
+                if (configuredProxies != null)
+                {
+                    foreach (var proxy in configuredProxies)
+                    {
+                        if (IPAddress.TryParse(proxy, out var ip))
+                        {
+                            options.KnownProxies.Add(ip);
+                        }
+                    }
+                }
+            }
         });
 
         return services;
