@@ -150,6 +150,14 @@ public class AuthRateLimitingHttpIntegrationTests
                 app.UseEndpoints(endpoints =>
                 {
                     endpoints.MapControllers();
+                    endpoints.MapGet("/api/test/remote-ip-probe", async ctx =>
+                    {
+                        await ctx.Response.WriteAsync(ctx.Connection.RemoteIpAddress?.ToString() ?? "null");
+                    });
+                    endpoints.MapGet("/api/test/scheme-probe", async ctx =>
+                    {
+                        await ctx.Response.WriteAsync(ctx.Request.Scheme);
+                    });
                 });
             });
 
@@ -158,7 +166,7 @@ public class AuthRateLimitingHttpIntegrationTests
         return (server, client, spyUserStore, inMemoryDbName);
     }
 
-    private HttpRequestMessage CreateLoginRequest(string peerIp, string? forwardedFor = null)
+    private HttpRequestMessage CreateLoginRequest(string peerIp, string? forwardedFor = null, string? forwardedProto = null)
     {
         var request = new HttpRequestMessage(HttpMethod.Post, "/api/auth/login")
         {
@@ -172,6 +180,10 @@ public class AuthRateLimitingHttpIntegrationTests
         if (!string.IsNullOrEmpty(forwardedFor))
         {
             request.Headers.Add("X-Forwarded-For", forwardedFor);
+        }
+        if (!string.IsNullOrEmpty(forwardedProto))
+        {
+            request.Headers.Add("X-Forwarded-Proto", forwardedProto);
         }
         return request;
     }
@@ -302,6 +314,104 @@ public class AuthRateLimitingHttpIntegrationTests
             using var res11 = await client.SendAsync(req11);
 
             Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_T4_B_DynamicUpstreamSpoofing_SharesSamePartitionAndReachesQuota()
+    {
+        // T4-B : Renforcement anti-usurpation dynamique (Phase 5A-2).
+        // Scénario : un client distant tente de saturer ou d'évader le rate limiter en injectant un en-tête falsifié
+        // avec des adresses variables à gauche : "198.51.100.{i}, 203.0.113.30".
+        // Le proxy de confiance (127.0.0.1) a reçu la requête depuis l'IP cliente réelle 203.0.113.30.
+        // Avec ForwardLimit = 1 et parcours de droite à gauche, ForwardedHeadersMiddleware retient TOUJOURS
+        // l'adresse 203.0.113.30 et ignore strictement la partie gauche variable.
+        var (server, client, spyStore, _) = CreateIsolatedTestServer();
+        using (server)
+        using (client)
+        {
+            const string proxyIp = "127.0.0.1";
+            const string targetClientIp = "203.0.113.30";
+
+            // 1. Preuve directe par la sonde que ForwardedHeadersMiddleware extrait l'IP de droite et non de gauche
+            var probeReq = new HttpRequestMessage(HttpMethod.Get, "/api/test/remote-ip-probe");
+            probeReq.Headers.Add("X-Test-IP", proxyIp);
+            probeReq.Headers.Add("X-Forwarded-For", $"198.51.100.999, {targetClientIp}");
+            using (var probeRes = await client.SendAsync(probeReq))
+            {
+                var probedIp = await probeRes.Content.ReadAsStringAsync();
+                Assert.Equal(targetClientIp, probedIp); // Prouve que l'IP retenue est réellement 203.0.113.30 et non 198.51.100.999
+            }
+
+            // 2. Requêtes 1 à 10 : faire varier la valeur injectée à gauche à chaque requête
+            for (int i = 1; i <= AuthRateLimitingConfig.DefaultPermitLimit; i++)
+            {
+                var dynamicChain = $"198.51.100.{i}, {targetClientIp}";
+                using var req = CreateLoginRequest(proxyIp, dynamicChain);
+                using var res = await client.SendAsync(req);
+
+                Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+                Assert.False(res.Headers.Contains("Retry-After"));
+            }
+
+            Assert.Equal(10, spyStore.FindByEmailCallCount);
+
+            // 3. 11e requête : l'attaquant injecte encore une IP de gauche différente (192.0.2.77)
+            // Si le partitionnement dépendait de la valeur de gauche, la 11e requête aurait une nouvelle partition (192.0.2.77)
+            // et renverrait 401 Unauthorized.
+            // Mais parce que ForwardedHeadersMiddleware retient targetClientIp (203.0.113.30),
+            // la partition est saturée (10/10) et la 11e requête est immédiatement bloquée en HTTP 429 !
+            var evasionChain = $"192.0.2.77, {targetClientIp}";
+            using var req11 = CreateLoginRequest(proxyIp, evasionChain);
+            using var res11 = await client.SendAsync(req11);
+
+            Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
+            Assert.True(res11.Headers.Contains("Retry-After"));
+            Assert.Equal(10, spyStore.FindByEmailCallCount); // AuthService non sollicité pour la 11e requête
+
+            // 4. Preuve de non-contamination : un autre client légitime (203.0.113.31) via le MÊME proxy
+            // avec une IP gauche réutilisée (198.51.100.1) n'est PAS bloqué.
+            // Cela prouve que la partition est indexée strictement sur 203.0.113.30 et non sur 127.0.0.1 ni sur l'IP gauche.
+            var otherClientChain = "198.51.100.1, 203.0.113.31";
+            using var reqOther = CreateLoginRequest(proxyIp, otherClientChain);
+            using var resOther = await client.SendAsync(reqOther);
+
+            Assert.Equal(HttpStatusCode.Unauthorized, resOther.StatusCode);
+            Assert.False(resOther.Headers.Contains("Retry-After"));
+            Assert.Equal(11, spyStore.FindByEmailCallCount);
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_T4_C_ForwardedProto_FromTrustedProxy_ResolvesSchemeToHttps()
+    {
+        // T4-C : Vérification de la résolution du Scheme HTTPS via X-Forwarded-Proto (Phase 5A-2).
+        // Prouve que UseForwardedHeaders() résout correctement le Scheme avant UseHttpsRedirection().
+        var (server, client, _, _) = CreateIsolatedTestServer();
+        using (server)
+        using (client)
+        {
+            const string proxyIp = "127.0.0.1";
+
+            // Requête depuis le proxy de confiance avec X-Forwarded-Proto: https
+            var trustedReq = new HttpRequestMessage(HttpMethod.Get, "/api/test/scheme-probe");
+            trustedReq.Headers.Add("X-Test-IP", proxyIp);
+            trustedReq.Headers.Add("X-Forwarded-Proto", "https");
+
+            using var trustedRes = await client.SendAsync(trustedReq);
+            var trustedScheme = await trustedRes.Content.ReadAsStringAsync();
+            Assert.Equal("https", trustedScheme);
+
+            // Requête depuis un pair TCP non autorisé avec tentative de spoofing de schéma
+            const string untrustedIp = "198.51.100.99";
+            var untrustedReq = new HttpRequestMessage(HttpMethod.Get, "/api/test/scheme-probe");
+            untrustedReq.Headers.Add("X-Test-IP", untrustedIp);
+            untrustedReq.Headers.Add("X-Forwarded-Proto", "https");
+
+            using var untrustedRes = await client.SendAsync(untrustedReq);
+            var untrustedScheme = await untrustedRes.Content.ReadAsStringAsync();
+            // Le pair n'est pas dans KnownProxies -> X-Forwarded-Proto est ignoré, le schéma reste http
+            Assert.Equal("http", untrustedScheme);
         }
     }
 
