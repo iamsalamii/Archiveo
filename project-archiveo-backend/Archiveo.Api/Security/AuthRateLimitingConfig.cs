@@ -147,9 +147,67 @@ public static class AuthRateLimitingConfig
                         }
                     }
                 }
+
+                var configuredNetworks = configuration.GetSection("ForwardedHeaders:KnownNetworks").Get<string[]>();
+                if (configuredNetworks != null)
+                {
+                    foreach (var networkStr in configuredNetworks)
+                    {
+                        if (TryParseCidr(networkStr, out var network) && network != null)
+                        {
+                            options.KnownNetworks.Add(network);
+                        }
+                    }
+                }
             }
         });
 
         return services;
+    }
+
+    /// <summary>
+    /// Tente de parser une chaîne de caractères au format CIDR (ex: "172.16.0.0/12")
+    /// en instance valide de Microsoft.AspNetCore.HttpOverrides.IPNetwork.
+    /// Valide rigoureusement la famille d'adresses (IPv4/IPv6) et la plage du masque.
+    /// </summary>
+    public static bool TryParseCidr(string? cidr, out Microsoft.AspNetCore.HttpOverrides.IPNetwork? network)
+    {
+        network = null;
+        if (string.IsNullOrWhiteSpace(cidr))
+        {
+            return false;
+        }
+
+        var parts = cidr.Trim().Split('/');
+        if (parts.Length != 2)
+        {
+            return false;
+        }
+
+        if (!IPAddress.TryParse(parts[0], out var prefix))
+        {
+            return false;
+        }
+
+        if (!int.TryParse(parts[1], out var prefixLength))
+        {
+            return false;
+        }
+
+        int maxPrefixLength = prefix.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork ? 32 : 128;
+        if (prefixLength < 0 || prefixLength > maxPrefixLength)
+        {
+            return false;
+        }
+
+        try
+        {
+            network = new Microsoft.AspNetCore.HttpOverrides.IPNetwork(prefix, prefixLength);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

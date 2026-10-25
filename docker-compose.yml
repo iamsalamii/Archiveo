@@ -45,8 +45,9 @@ services:
       - JwtSettings__ExpiryInDays=7
       - SeedAdmin__Password=${ADMIN_PASSWORD:-Admin123!}
       - Storage__UploadPath=/app/uploads
+      - ForwardedHeaders__KnownNetworks__0=${FORWARDED_NETWORKS:-172.16.0.0/12}
     ports:
-      - "5000:5000"
+      - "${API_BIND_IP:-127.0.0.1}:5000:5000"
     volumes:
       - archiveo_uploads:/app/uploads
     networks:

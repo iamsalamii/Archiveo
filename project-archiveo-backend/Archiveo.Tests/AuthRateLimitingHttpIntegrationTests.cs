@@ -17,6 +17,7 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -437,6 +438,133 @@ public class AuthRateLimitingHttpIntegrationTests
 
             Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
         }
+    }
+
+    // =========================================================================
+    // SCÉNARIOS PHASE 5B : VALIDATION DU SOUS-RÉSEAU DOCKER BRIDGE (T7 à T9)
+    // =========================================================================
+
+    [Fact]
+    public async Task Scenario_T7_KnownNetworks_DockerBridgeSubnet_ResolvesClientIpCorrectly()
+    {
+        // T7 : Validation du support de KnownNetworks (Phase 5B).
+        // Scénario : Nginx sur l'hôte envoie une requête vers Kestrel dans le conteneur.
+        // La requête traverse le bridge Docker (172.16.0.0/12) et arrive avec l'IP passerelle 172.18.0.1.
+        // Avec ForwardedHeaders:KnownNetworks = ["172.16.0.0/12"], Kestrel reconnaît la passerelle
+        // comme un proxy de confiance et résout correctement l'IP cliente réelle (203.0.113.88).
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ForwardedHeaders:KnownNetworks:0"] = "172.16.0.0/12"
+            })
+            .Build();
+
+        var (server, client, spyStore, _) = CreateIsolatedTestServer(config);
+        using (server)
+        using (client)
+        {
+            const string dockerGatewayIp = "172.18.0.1";
+            const string clientIp = "203.0.113.88";
+
+            // 1. Sonde directe : l'IP résolue doit être clientIp et non la passerelle Docker
+            var probeReq = new HttpRequestMessage(HttpMethod.Get, "/api/test/remote-ip-probe");
+            probeReq.Headers.Add("X-Test-IP", dockerGatewayIp);
+            probeReq.Headers.Add("X-Forwarded-For", clientIp);
+            using (var probeRes = await client.SendAsync(probeReq))
+            {
+                var probedIp = await probeRes.Content.ReadAsStringAsync();
+                Assert.Equal(clientIp, probedIp);
+            }
+
+            // 2. 10 requêtes sous quota pour clientIp
+            for (int i = 1; i <= AuthRateLimitingConfig.DefaultPermitLimit; i++)
+            {
+                using var req = CreateLoginRequest(dockerGatewayIp, clientIp);
+                using var res = await client.SendAsync(req);
+                Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+            }
+
+            Assert.Equal(10, spyStore.FindByEmailCallCount);
+
+            // 3. 11e requête pour clientIp : doit retourner 429
+            using var req11 = CreateLoginRequest(dockerGatewayIp, clientIp);
+            using var res11 = await client.SendAsync(req11);
+            Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
+            Assert.True(res11.Headers.Contains("Retry-After"));
+
+            // 4. Preuve de non-contamination : un autre client (203.0.113.89) via la MÊME passerelle n'est pas bloqué
+            // Résout définitivement le risque de déni de service global (P0) !
+            const string anotherClientIp = "203.0.113.89";
+            using var reqOther = CreateLoginRequest(dockerGatewayIp, anotherClientIp);
+            using var resOther = await client.SendAsync(reqOther);
+            Assert.Equal(HttpStatusCode.Unauthorized, resOther.StatusCode);
+            Assert.Equal(11, spyStore.FindByEmailCallCount);
+        }
+    }
+
+    [Fact]
+    public async Task Scenario_T8_KnownNetworks_UntrustedSubnetPeer_IsIgnoredAndCannotSpoofIp()
+    {
+        // T8 : Un pair TCP en dehors de KnownNetworks et KnownProxies ne peut pas forger d'IP.
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ForwardedHeaders:KnownNetworks:0"] = "172.16.0.0/12"
+            })
+            .Build();
+
+        var (server, client, _, _) = CreateIsolatedTestServer(config);
+        using (server)
+        using (client)
+        {
+            const string untrustedPeerIp = "198.51.100.99";
+
+            var probeReq = new HttpRequestMessage(HttpMethod.Get, "/api/test/remote-ip-probe");
+            probeReq.Headers.Add("X-Test-IP", untrustedPeerIp);
+            probeReq.Headers.Add("X-Forwarded-For", "203.0.113.88");
+
+            using var probeRes = await client.SendAsync(probeReq);
+            var probedIp = await probeRes.Content.ReadAsStringAsync();
+
+            // 198.51.100.99 n'est pas dans 172.16.0.0/12 ni dans KnownProxies -> X-Forwarded-For est rejeté
+            Assert.Equal(untrustedPeerIp, probedIp);
+        }
+    }
+
+    [Fact]
+    public void Scenario_T9_TryParseCidr_ValidAndInvalidFormats_HandledGracefully()
+    {
+        // T9 : Validation unitaire exhaustive de la robustesse de TryParseCidr
+        // Formats valides IPv4
+        Assert.True(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/12", out var net1));
+        Assert.NotNull(net1);
+        Assert.True(net1.Contains(IPAddress.Parse("172.18.0.1")));
+        Assert.False(net1.Contains(IPAddress.Parse("192.168.1.1")));
+
+        Assert.True(AuthRateLimitingConfig.TryParseCidr("10.0.0.0/8", out var net2));
+        Assert.NotNull(net2);
+        Assert.True(net2.Contains(IPAddress.Parse("10.255.0.1")));
+
+        Assert.True(AuthRateLimitingConfig.TryParseCidr("192.168.1.0/24", out var net3));
+        Assert.NotNull(net3);
+
+        Assert.True(AuthRateLimitingConfig.TryParseCidr("0.0.0.0/0", out var net4));
+        Assert.NotNull(net4);
+
+        // Formats valides IPv6
+        Assert.True(AuthRateLimitingConfig.TryParseCidr("::1/128", out var net6));
+        Assert.NotNull(net6);
+
+        // Formats invalides : ne doivent lever AUCUNE exception et renvoyer false
+        Assert.False(AuthRateLimitingConfig.TryParseCidr(null, out _));
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("", out _));
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("   ", out _));
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("172.16.0.0", out _)); // Manque le /masque
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/33", out _)); // Masque > 32 en IPv4
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/-1", out _)); // Masque négatif
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("invalid/24", out _)); // IP invalide
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/invalid", out _)); // Masque non numérique
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/12/34", out _)); // Trop de segments
     }
 
     // =========================================================================
