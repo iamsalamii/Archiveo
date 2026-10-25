@@ -532,10 +532,11 @@ public class AuthRateLimitingHttpIntegrationTests
     }
 
     [Fact]
-    public void Scenario_T9_TryParseCidr_ValidAndInvalidFormats_HandledGracefully()
+    public void Scenario_T9_TryParseCidr_SyntaxVsSemanticValidation_DistinguishedCorrectly()
     {
-        // T9 : Validation unitaire exhaustive de la robustesse de TryParseCidr
-        // Formats valides IPv4
+        // T9 : Validation unitaire distinguant la syntaxe pure de l'acceptabilité sémantique pour la confiance (Phase 5B-2).
+        
+        // 1. Formats valides et sémantiquement acceptables
         Assert.True(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/12", out var net1));
         Assert.NotNull(net1);
         Assert.True(net1.Contains(IPAddress.Parse("172.18.0.1")));
@@ -548,14 +549,23 @@ public class AuthRateLimitingHttpIntegrationTests
         Assert.True(AuthRateLimitingConfig.TryParseCidr("192.168.1.0/24", out var net3));
         Assert.NotNull(net3);
 
-        Assert.True(AuthRateLimitingConfig.TryParseCidr("0.0.0.0/0", out var net4));
-        Assert.NotNull(net4);
-
-        // Formats valides IPv6
         Assert.True(AuthRateLimitingConfig.TryParseCidr("::1/128", out var net6));
         Assert.NotNull(net6);
 
-        // Formats invalides : ne doivent lever AUCUNE exception et renvoyer false
+        // 2. Plages universelles (0.0.0.0/0 et ::/0) : syntaxiquement valides, mais SÉMANTIQUEMENT REJETÉES pour la confiance !
+        Assert.True(AuthRateLimitingConfig.TryParseCidrSyntax("0.0.0.0/0", out var pV4, out var lenV4));
+        Assert.Equal(IPAddress.Any, pV4);
+        Assert.Equal(0, lenV4);
+        // TryParseCidr (validation de confiance) doit renvoyer FALSE
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("0.0.0.0/0", out _));
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("::/0", out _));
+
+        // 3. Adresses multicast ou broadcast : sémantiquement rejetées pour un proxy TCP
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("224.0.0.0/4", out _)); // Multicast IPv4
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("255.255.255.255/32", out _)); // Broadcast IPv4
+        Assert.False(AuthRateLimitingConfig.TryParseCidr("ff02::1/128", out _)); // Multicast IPv6
+
+        // 4. Formats syntaxiquement invalides : ne doivent lever aucune exception et renvoyer false
         Assert.False(AuthRateLimitingConfig.TryParseCidr(null, out _));
         Assert.False(AuthRateLimitingConfig.TryParseCidr("", out _));
         Assert.False(AuthRateLimitingConfig.TryParseCidr("   ", out _));
@@ -565,6 +575,136 @@ public class AuthRateLimitingHttpIntegrationTests
         Assert.False(AuthRateLimitingConfig.TryParseCidr("invalid/24", out _)); // IP invalide
         Assert.False(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/invalid", out _)); // Masque non numérique
         Assert.False(AuthRateLimitingConfig.TryParseCidr("172.16.0.0/12/34", out _)); // Trop de segments
+    }
+
+    [Fact]
+    public void Scenario_T10_UniversalCidr_0_0_0_0_Zero_ThrowsInvalidOperationException()
+    {
+        // T10 : Rejet formel fail-fast de 0.0.0.0/0 et ::/0 dans la configuration (Phase 5B-2).
+        // Si un opérateur renseigne 0.0.0.0/0, le système DOIT lever une InvalidOperationException explicite au démarrage.
+        var configV4 = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ForwardedHeaders:KnownNetworks:0"] = "0.0.0.0/0"
+            })
+            .Build();
+
+        var exV4 = Assert.Throws<InvalidOperationException>(() =>
+        {
+            CreateIsolatedTestServer(configV4);
+        });
+        Assert.Contains("La plage universelle", exV4.Message);
+        Assert.Contains("0.0.0.0/0", exV4.Message);
+
+        var configV6 = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ForwardedHeaders:KnownNetworks:0"] = "::/0"
+            })
+            .Build();
+
+        var exV6 = Assert.Throws<InvalidOperationException>(() =>
+        {
+            CreateIsolatedTestServer(configV6);
+        });
+        Assert.Contains("La plage universelle", exV6.Message);
+        Assert.Contains("::/0", exV6.Message);
+    }
+
+    [Fact]
+    public void Scenario_T11_MalformedCidr_ThrowsInvalidOperationException_FailFast()
+    {
+        // T11 : Échec explicite (fail-fast) au démarrage si une valeur malformée est fournie (Phase 5B-2).
+        // Prouve que les erreurs de configuration ne sont jamais silencieusement ignorées.
+        var malformedConfig = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ForwardedHeaders:KnownNetworks:0"] = "172.16.0.0/33"
+            })
+            .Build();
+
+        var ex = Assert.Throws<InvalidOperationException>(() =>
+        {
+            CreateIsolatedTestServer(malformedConfig);
+        });
+        Assert.Contains("Configuration ForwardedHeaders:KnownNetworks invalide", ex.Message);
+        Assert.Contains("172.16.0.0/33", ex.Message);
+    }
+
+    [Fact]
+    public async Task Scenario_T12_MultiNetworkCoexistence_CommaSeparated_BothSubnetsTrusted()
+    {
+        // T12 : Coexistence de multiples réseaux de confiance délimités par des virgules (Phase 5B-2).
+        // Scénario : L'opérateur spécifie FORWARDED_NETWORKS="172.16.0.0/12, 10.0.0.0/8".
+        // Les deux réseaux doivent être acceptés simultanément :
+        // - Proxy 1 sur bridge Docker (172.18.0.1) est de confiance.
+        // - Proxy 2 sur réseau d'entreprise (10.50.1.1) est de confiance.
+        // - Un pair TCP hors de ces deux réseaux (198.51.100.99) est rejeté.
+        // - L'étanchéité des quotas entre les clients réels est préservée.
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["ForwardedHeaders:KnownNetworks"] = "172.16.0.0/12, 10.0.0.0/8"
+            })
+            .Build();
+
+        var (server, client, spyStore, _) = CreateIsolatedTestServer(config);
+        using (server)
+        using (client)
+        {
+            const string proxy1Ip = "172.18.0.1";
+            const string client1Ip = "203.0.113.101";
+
+            const string proxy2Ip = "10.50.1.1";
+            const string client2Ip = "203.0.113.102";
+
+            const string untrustedIp = "198.51.100.99";
+
+            // 1. Sonde Proxy 1 (172.18.0.1) -> résout client1Ip
+            var probe1 = new HttpRequestMessage(HttpMethod.Get, "/api/test/remote-ip-probe");
+            probe1.Headers.Add("X-Test-IP", proxy1Ip);
+            probe1.Headers.Add("X-Forwarded-For", client1Ip);
+            using (var res1 = await client.SendAsync(probe1))
+            {
+                Assert.Equal(client1Ip, await res1.Content.ReadAsStringAsync());
+            }
+
+            // 2. Sonde Proxy 2 (10.50.1.1) -> résout client2Ip
+            var probe2 = new HttpRequestMessage(HttpMethod.Get, "/api/test/remote-ip-probe");
+            probe2.Headers.Add("X-Test-IP", proxy2Ip);
+            probe2.Headers.Add("X-Forwarded-For", client2Ip);
+            using (var res2 = await client.SendAsync(probe2))
+            {
+                Assert.Equal(client2Ip, await res2.Content.ReadAsStringAsync());
+            }
+
+            // 3. Sonde Pair non fiable (198.51.100.99) -> X-Forwarded-For ignoré, renvoie 198.51.100.99
+            var probeUntrusted = new HttpRequestMessage(HttpMethod.Get, "/api/test/remote-ip-probe");
+            probeUntrusted.Headers.Add("X-Test-IP", untrustedIp);
+            probeUntrusted.Headers.Add("X-Forwarded-For", "203.0.113.200");
+            using (var resUntrusted = await client.SendAsync(probeUntrusted))
+            {
+                Assert.Equal(untrustedIp, await resUntrusted.Content.ReadAsStringAsync());
+            }
+
+            // 4. Épuisement quota Client 1 via Proxy 1
+            for (int i = 1; i <= AuthRateLimitingConfig.DefaultPermitLimit; i++)
+            {
+                using var req = CreateLoginRequest(proxy1Ip, client1Ip);
+                using var res = await client.SendAsync(req);
+                Assert.Equal(HttpStatusCode.Unauthorized, res.StatusCode);
+            }
+
+            // 11e requête Client 1 -> bloquée en 429
+            using var req11 = CreateLoginRequest(proxy1Ip, client1Ip);
+            using var res11 = await client.SendAsync(req11);
+            Assert.Equal(HttpStatusCode.TooManyRequests, res11.StatusCode);
+
+            // 5. Client 2 via Proxy 2 -> NON bloqué (partition indépendante)
+            using var reqClient2 = CreateLoginRequest(proxy2Ip, client2Ip);
+            using var resClient2 = await client.SendAsync(reqClient2);
+            Assert.Equal(HttpStatusCode.Unauthorized, resClient2.StatusCode);
+        }
     }
 
     // =========================================================================

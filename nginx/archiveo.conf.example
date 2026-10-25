@@ -4,6 +4,20 @@
 # Puis activer via : sudo ln -s /etc/nginx/sites-available/archiveo.conf /etc/nginx/sites-enabled/
 # ==============================================================================
 
+# ==============================================================================
+# REMARQUE ARCHITECTURE MULTI-SITES & CONTEXTE NGINX (DIRECTIVE 'map') :
+# 1. Contexte obligatoire : la directive 'map' ci-dessous DOIT résider dans le
+#    bloc 'http { ... }'. Elle est autorisée en tête de ce fichier uniquement
+#    si ce fichier est inclus directement dans le bloc 'http' de /etc/nginx/nginx.conf
+#    (cas par défaut de Debian/Ubuntu via : include /etc/nginx/sites-enabled/*;).
+# 2. Risque de collision en environnement multi-sites :
+#    Si la variable '$connection_upgrade' est DÉJÀ déclarée dans votre /etc/nginx/nginx.conf
+#    ou dans un autre fichier de configuration inclus (ex: /etc/nginx/conf.d/websocket.conf),
+#    Nginx rejettera la configuration au rechargement avec l'erreur :
+#    "nginx: [emerg] the duplicate 'connection_upgrade' variable".
+#    Dans ce cas, COMMENTEZ simplement le bloc 'map' ci-dessous (lignes 22 à 25).
+# ==============================================================================
+
 # Mapping pour la gestion des WebSockets (SignalR pour /hubs/notifications)
 map $http_upgrade $connection_upgrade {
     default upgrade;
