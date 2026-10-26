@@ -5,6 +5,7 @@ using System.IO;
 using System.Security.Claims;
 using System.Text;
 using Archiveo.Application.Security;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using Xunit;
 
@@ -283,5 +284,56 @@ public class Ano05JwtSecurityAndAudienceTests
             // THEN: l'audience par défaut dans appsettings.json doit être canonisée
             Assert.Contains("\"Audience\": \"ArchiveoClient\"", content);
         }
+    }
+
+    [Fact]
+    public void Test_14_GetTokenLifetime_ReturnsConfiguredDays_WhenExpiryInDaysPresent()
+    {
+        // GIVEN: configuration injectant JwtSettings:ExpiryInDays = 7 (comme dans docker-compose.yml)
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["JwtSettings:ExpiryInDays"] = "7"
+            })
+            .Build();
+
+        // WHEN: résolution de la durée de vie du jeton
+        var lifetime = JwtSecurityPolicy.GetTokenLifetime(config);
+
+        // THEN: la durée de vie doit être exactement 7 jours
+        Assert.Equal(TimeSpan.FromDays(7), lifetime);
+    }
+
+    [Fact]
+    public void Test_15_GetTokenLifetime_ReturnsDefaultOneHour_WhenConfigurationMissingOrEmpty()
+    {
+        // GIVEN: configuration vide ou nulle (environnement par défaut sans surcharge)
+        var emptyConfig = new ConfigurationBuilder().Build();
+
+        // WHEN: résolution de la durée de vie
+        var lifetimeEmpty = JwtSecurityPolicy.GetTokenLifetime(emptyConfig);
+        var lifetimeNull = JwtSecurityPolicy.GetTokenLifetime(null);
+
+        // THEN: repli déterministe sur 1 heure (DefaultLifetime) sans altération arbitraire
+        Assert.Equal(TimeSpan.FromHours(1), lifetimeEmpty);
+        Assert.Equal(TimeSpan.FromHours(1), lifetimeNull);
+    }
+
+    [Fact]
+    public void Test_16_GetTokenLifetime_ReturnsConfiguredHours_WhenExpiryInHoursPresent()
+    {
+        // GIVEN: configuration avec JwtSettings:ExpiryInHours = 12
+        var config = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["JwtSettings:ExpiryInHours"] = "12"
+            })
+            .Build();
+
+        // WHEN: résolution de la durée de vie
+        var lifetime = JwtSecurityPolicy.GetTokenLifetime(config);
+
+        // THEN: la durée de vie doit être 12 heures
+        Assert.Equal(TimeSpan.FromHours(12), lifetime);
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Archiveo.Application.Security;
@@ -137,5 +138,43 @@ public static class JwtSecurityPolicy
             IssuerSigningKey = new SymmetricSecurityKey(key),
             ClockSkew = clockSkew ?? TimeSpan.FromSeconds(30)
         };
+    }
+
+    /// <summary>
+    /// Durée de validité par défaut des jetons JWT en l'absence de configuration explicite (1 heure).
+    /// </summary>
+    public static readonly TimeSpan DefaultLifetime = TimeSpan.FromHours(1);
+
+    /// <summary>
+    /// Résout la durée de vie du jeton JWT à partir de la configuration (JwtSettings:ExpiryInDays ou JwtSettings:ExpiryInHours).
+    /// Si aucune valeur valide n'est configurée, utilise la durée par défaut (1 heure) sans altération arbitraire.
+    /// </summary>
+    public static TimeSpan GetTokenLifetime(IConfiguration? configuration)
+    {
+        if (configuration == null)
+        {
+            return DefaultLifetime;
+        }
+
+        var jwtSettings = configuration.GetSection("JwtSettings");
+        var expiryInDaysStr = jwtSettings["ExpiryInDays"]
+            ?? configuration["JwtSettings:ExpiryInDays"]
+            ?? configuration["JWT_EXPIRY_IN_DAYS"];
+
+        if (int.TryParse(expiryInDaysStr, out var days) && days > 0)
+        {
+            return TimeSpan.FromDays(days);
+        }
+
+        var expiryInHoursStr = jwtSettings["ExpiryInHours"]
+            ?? configuration["JwtSettings:ExpiryInHours"]
+            ?? configuration["JWT_EXPIRY_IN_HOURS"];
+
+        if (int.TryParse(expiryInHoursStr, out var hours) && hours > 0)
+        {
+            return TimeSpan.FromHours(hours);
+        }
+
+        return DefaultLifetime;
     }
 }

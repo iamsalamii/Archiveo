@@ -124,11 +124,13 @@ public class AuthService
             claims.Add(new Claim(ClaimTypes.Role, role));
         }
 
+        var lifetime = Archiveo.Application.Security.JwtSecurityPolicy.GetTokenLifetime(_configuration);
+
         var token = new JwtSecurityToken(
             issuer: issuer,
             audience: audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddHours(1),
+            expires: DateTime.UtcNow.Add(lifetime),
             signingCredentials: credentials
         );
 
