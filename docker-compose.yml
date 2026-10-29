@@ -13,7 +13,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Veuillez renseigner POSTGRES_PASSWORD dans votre fichier .env}
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-15432}:5432"
     volumes:
       - archiveo_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -47,7 +47,7 @@ services:
       - Storage__UploadPath=/app/uploads
       - ForwardedHeaders__KnownNetworks__0=${FORWARDED_NETWORKS:-172.16.0.0/12}
     ports:
-      - "${API_BIND_IP:-127.0.0.1}:5000:5000"
+      - "${API_PORT:-15000}:5000"
     volumes:
       - archiveo_uploads:/app/uploads
     networks:
@@ -70,7 +70,7 @@ services:
       - NODE_ENV=production
       - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:5000/api}
     ports:
-      - "3000:3000"
+      - "${FRONTEND_PORT:-13000}:3000"
     networks:
       - archiveo_network
 
