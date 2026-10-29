@@ -236,17 +236,17 @@ using (var scope = app.Services.CreateScope())
         }
     }
 
-    // Le compte de démonstration ne doit jamais être créé en production.
-    if (app.Environment.IsDevelopment())
-    {
-        var adminEmail = "admin@archiveo.com";
-        var adminPassword = builder.Configuration["SeedAdmin:Password"];
-        if (string.IsNullOrWhiteSpace(adminPassword))
-        {
-            throw new InvalidOperationException("SeedAdmin:Password est requis uniquement pour le développement local.");
-        }
+    // Initialisation du compte administrateur initial si configuré
+    var adminPassword = builder.Configuration["SeedAdmin:Password"]
+        ?? builder.Configuration["ADMIN_PASSWORD"]
+        ?? (app.Environment.IsDevelopment() ? "Admin123!" : null);
 
-        if (await userManager.FindByEmailAsync(adminEmail) == null)
+    if (!string.IsNullOrWhiteSpace(adminPassword))
+    {
+        var adminEmail = builder.Configuration["SeedAdmin:Email"] ?? "admin@archiveo.com";
+        var existingAdmin = await userManager.FindByEmailAsync(adminEmail);
+
+        if (existingAdmin == null)
         {
             var adminUser = new User
             {
@@ -264,6 +264,11 @@ using (var scope = app.Services.CreateScope())
             {
                 await userManager.AddToRoleAsync(adminUser, "Admin");
             }
+        }
+        else if (!await userManager.CheckPasswordAsync(existingAdmin, adminPassword))
+        {
+            var resetToken = await userManager.GeneratePasswordResetTokenAsync(existingAdmin);
+            await userManager.ResetPasswordAsync(existingAdmin, resetToken, adminPassword);
         }
     }
 
