@@ -24,9 +24,9 @@ export function FirstLoginDialog() {
 
   if (!mustChangePassword) return null;
 
-  const handleSubmit = () => {
-    if (password.length < 6) {
-      setError('Le mot de passe doit contenir au moins 6 caractères');
+  const handleSubmit = async () => {
+    if (password.length < 12) {
+      setError('Le mot de passe doit contenir au moins 12 caractères');
       return;
     }
     if (password !== confirm) {
@@ -37,11 +37,15 @@ export function FirstLoginDialog() {
       setError('Le mot de passe actuel est requis');
       return;
     }
-    void changePassword(currentPassword, password);
-    setCurrentPassword('');
-    setPassword('');
-    setConfirm('');
-    setError('');
+    try {
+      await changePassword(currentPassword, password);
+      setCurrentPassword('');
+      setPassword('');
+      setConfirm('');
+      setError('');
+    } catch (err: any) {
+      setError(err?.message || 'Erreur lors du changement de mot de passe');
+    }
   };
 
   return (

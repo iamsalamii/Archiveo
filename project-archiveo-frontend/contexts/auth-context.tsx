@@ -193,9 +193,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                     setUser({ ...user, mustChangePassword: false });
                 }
                 return true;
-            } catch (error) {
+            } catch (error: any) {
                 console.error('Erreur changement mot de passe:', error);
-                return false;
+                const msg = error?.data?.message || error?.message || 'Erreur lors du changement de mot de passe';
+                throw new Error(msg);
             }
         },
         [user]

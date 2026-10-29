@@ -73,20 +73,23 @@ public class AuthService
         };
     }
 
-    public async Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordRequest request)
+    public async Task<(bool Succeeded, string? ErrorMessage)> ChangePasswordAsync(Guid userId, ChangePasswordRequest request)
     {
         var user = await _userManager.FindByIdAsync(userId.ToString());
         if (user == null)
-            return false;
+            return (false, "Utilisateur introuvable.");
 
         var result = await _userManager.ChangePasswordAsync(user, request.CurrentPassword, request.NewPassword);
         if (!result.Succeeded)
-            return false;
+        {
+            var errors = string.Join(" ", result.Errors.Select(e => e.Description));
+            return (false, errors);
+        }
 
         user.MustChangePassword = false;
         await _userManager.UpdateAsync(user);
 
-        return true;
+        return (true, null);
     }
 
     private string GenerateJwtToken(User user, IList<string> roles)

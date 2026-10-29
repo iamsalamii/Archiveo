@@ -73,9 +73,9 @@ public class AuthController : ControllerBase
         if (userId == null)
             return Unauthorized();
 
-        var success = await _authService.ChangePasswordAsync(Guid.Parse(userId), request);
-        if (!success)
-            return BadRequest(new { message = "Impossible de changer le mot de passe" });
+        var (succeeded, error) = await _authService.ChangePasswordAsync(Guid.Parse(userId), request);
+        if (!succeeded)
+            return BadRequest(new { message = error ?? "Impossible de changer le mot de passe" });
 
         return Ok(new { message = "Mot de passe changé avec succès" });
     }

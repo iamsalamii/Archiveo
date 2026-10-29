@@ -256,7 +256,7 @@ using (var scope = app.Services.CreateScope())
                 LastName = "Système",
                 Matricule = "ADMIN001",
                 Function = "Administrateur",
-                MustChangePassword = true
+                MustChangePassword = false
             };
 
             var result = await userManager.CreateAsync(adminUser, adminPassword);
@@ -265,10 +265,20 @@ using (var scope = app.Services.CreateScope())
                 await userManager.AddToRoleAsync(adminUser, "Admin");
             }
         }
-        else if (!await userManager.CheckPasswordAsync(existingAdmin, adminPassword))
+        else
         {
-            var resetToken = await userManager.GeneratePasswordResetTokenAsync(existingAdmin);
-            await userManager.ResetPasswordAsync(existingAdmin, resetToken, adminPassword);
+            // Déverrouiller le compte administrateur bootstrap pour permettre l'accès direct
+            if (existingAdmin.MustChangePassword)
+            {
+                existingAdmin.MustChangePassword = false;
+                await userManager.UpdateAsync(existingAdmin);
+            }
+
+            if (!await userManager.CheckPasswordAsync(existingAdmin, adminPassword))
+            {
+                var resetToken = await userManager.GeneratePasswordResetTokenAsync(existingAdmin);
+                await userManager.ResetPasswordAsync(existingAdmin, resetToken, adminPassword);
+            }
         }
     }
 

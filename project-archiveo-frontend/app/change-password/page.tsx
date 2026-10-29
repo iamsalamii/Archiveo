@@ -14,18 +14,18 @@ import { toast } from 'sonner';
 export default function ChangePasswordPage() {
     const router = useRouter();
     const { user, logout, changePassword } = useAuth();
-    const [currentPassword, setCurrentPassword] = useState<string>('Archiveo@2024');
+    const [currentPassword, setCurrentPassword] = useState<string>('');
     const [newPassword, setNewPassword] = useState<string>('');
     const [confirmPassword, setConfirmPassword] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string>('');
 
     const validatePassword = (pwd: string): string | null => {
-        if (pwd.length < 8) return 'Au moins 8 caracteres';
+        if (pwd.length < 12) return 'Au moins 12 caractères';
         if (!/[A-Z]/.test(pwd)) return 'Au moins une majuscule';
         if (!/[a-z]/.test(pwd)) return 'Au moins une minuscule';
         if (!/[0-9]/.test(pwd)) return 'Au moins un chiffre';
-        if (!/[!@#$%^&*]/.test(pwd)) return 'Au moins un caractere special';
+        if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?]/.test(pwd)) return 'Au moins un caractère spécial';
         return null;
     };
 
@@ -51,15 +51,11 @@ export default function ChangePasswordPage() {
 
         setLoading(true);
         try {
-            const success = await changePassword(currentPassword, newPassword);
-            if (success) {
-                toast.success('Mot de passe modifie !');
-                window.location.href = '/dashboard';
-            } else {
-                setError('Mot de passe actuel incorrect');
-            }
+            await changePassword(currentPassword, newPassword);
+            toast.success('Mot de passe modifié !');
+            window.location.href = '/dashboard';
         } catch (err) {
-            setError((err as Error).message || 'Erreur lors du changement');
+            setError((err as Error).message || 'Erreur lors du changement de mot de passe');
         } finally {
             setLoading(false);
         }
@@ -77,7 +73,7 @@ export default function ChangePasswordPage() {
                         Changement de mot de passe requis
                     </CardTitle>
                     <CardDescription>
-                        Bonjour {user?.firstName}, pour des raisons de securite, vous devez definir un nouveau mot de passe.
+                        Bonjour {user?.firstName}, pour des raisons de sécurité, vous devez définir un nouveau mot de passe.
                     </CardDescription>
                 </CardHeader>
                 <CardContent>
@@ -85,7 +81,7 @@ export default function ChangePasswordPage() {
                         <Alert className="border-amber-500/50 bg-amber-50 dark:bg-amber-950/30">
                             <AlertTriangle className="h-4 w-4 text-amber-600" />
                             <AlertDescription className="text-xs">
-                                Compte cree avec un mot de passe temporaire a changer.
+                                Compte créé avec un mot de passe temporaire à changer.
                             </AlertDescription>
                         </Alert>
 
@@ -95,8 +91,8 @@ export default function ChangePasswordPage() {
                                 type="password"
                                 value={currentPassword}
                                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentPassword(e.target.value)}
+                                placeholder="Mot de passe temporaire actuel"
                             />
-                            <p className="text-xs text-muted-foreground">Par defaut : Archiveo@2024</p>
                         </div>
 
                         <div className="space-y-2">
