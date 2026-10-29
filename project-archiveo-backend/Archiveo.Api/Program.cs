@@ -160,10 +160,29 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend", policy =>
     {
-        var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
-            ?? new[] { "http://localhost:3000" };
+        var configuredOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? Array.Empty<string>();
 
-        policy.WithOrigins(allowedOrigins)
+        var defaultAllowed = new[]
+        {
+            "http://localhost:3000",
+            "https://archiveo.vercel.app"
+        };
+
+        var allAllowed = defaultAllowed.Concat(configuredOrigins).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
+
+        policy.SetIsOriginAllowed(origin =>
+              {
+                  if (string.IsNullOrWhiteSpace(origin)) return false;
+                  if (allAllowed.Contains(origin, StringComparer.OrdinalIgnoreCase)) return true;
+                  if (Uri.TryCreate(origin, UriKind.Absolute, out var uri))
+                  {
+                      return uri.Host.EndsWith(".vercel.app", StringComparison.OrdinalIgnoreCase) ||
+                             uri.Host == "localhost" ||
+                             uri.Host == "127.0.0.1";
+                  }
+                  return false;
+              })
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
@@ -183,6 +202,7 @@ app.UseSwagger();
 app.UseSwaggerUI();
 
 app.UseForwardedHeaders();
+app.UseCors("AllowFrontend");
 app.UseHttpsRedirection();
 app.Use(async (context, next) =>
 {
@@ -191,7 +211,6 @@ app.Use(async (context, next) =>
     context.Response.Headers["Referrer-Policy"] = "no-referrer";
     await next();
 });
-app.UseCors("AllowFrontend");
 app.UseRateLimiter();
 app.UseAuthentication();
 app.UseAuthorization();

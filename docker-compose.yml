@@ -46,6 +46,7 @@ services:
       - SeedAdmin__Password=${ADMIN_PASSWORD:-Admin123!}
       - Storage__UploadPath=/app/uploads
       - ForwardedHeaders__KnownNetworks__0=${FORWARDED_NETWORKS:-172.16.0.0/12}
+      - Cors__AllowedOrigins__0=${CORS_ALLOWED_ORIGIN:-https://archiveo.vercel.app}
     ports:
       - "${API_PORT:-15000}:5000"
     volumes:
